@@ -59,26 +59,18 @@ class MainActivity : AppCompatActivity() {
     private var isPolling = false
     private var isFirstLoad = true
     private val CHANNEL_ID = "communique_chat"
-
-    // Search State
     private var currentSearchQuery = ""
     private var searchMatchIndices = mutableListOf<Int>()
     private var currentSearchIndex = -1
-
-    // View Bindings
     private lateinit var chatMessageContainer: LinearLayout
     private lateinit var chatScrollView: ScrollView
     private lateinit var userCountText: TextView
     private lateinit var searchPositionText: TextView
     private lateinit var searchIndicatorLayout: LinearLayout
     private lateinit var messageInput: EditText
-
-    // Drive Upload Token cache
     private var googleDriveAccessToken: String? = null
-    // Hardcoded target ID per specification
     private val TARGET_DRIVE_FOLDER_ID = "1RjvnpZ6Nhwf22-7lrTvQxU_0wn-HM_1e"
 
-    // Activity Result Launcher for Media Selection
     private val filePickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri?.let {
             Toast.makeText(this, "Preparing file for upload...", Toast.LENGTH_SHORT).show()
@@ -146,7 +138,6 @@ class MainActivity : AppCompatActivity() {
                     chatLayout.animate().alpha(1f).setDuration(600).start()
                     isPolling = true
                     startPollingGist()
-                    // Initialize Drive Auth in background securely
                     CoroutineScope(Dispatchers.IO).launch { fetchDriveAccessToken() }
                 }.start()
             } else {
@@ -154,7 +145,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Search Handlers
         searchIcon.setOnClickListener {
             if (searchContainer.visibility == View.VISIBLE) closeSearch(searchContainer, searchInput)
             else { searchContainer.visibility = View.VISIBLE; searchInput.requestFocus() }
@@ -185,12 +175,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Media Attachment
         attachButton.setOnClickListener {
             filePickerLauncher.launch("*/*")
         }
 
-        // Send Text Message
         findViewById<View>(R.id.sendButton).setOnClickListener {
             val text = messageInput.text.toString().trim()
             if (text.isNotEmpty()) {
@@ -200,7 +188,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // --- Core Messaging Logic ---
     private fun sendMessage(rawText: String, driveFileId: String?, fileType: String?) {
         val encryptedText = encryptMessage(rawText)
         val encryptedFileId = driveFileId?.let { encryptMessage(it) }
@@ -211,7 +198,6 @@ class MainActivity : AppCompatActivity() {
         CoroutineScope(Dispatchers.IO).launch { pushGistUpdate(chatHistory) }
     }
 
-    // --- Google Drive Upload Logic ---
     private suspend fun fetchDriveAccessToken() {
         try {
             val b64Json = BuildConfig.DRIVE_JSON_B64
@@ -226,13 +212,11 @@ class MainActivity : AppCompatActivity() {
                 .replace("-----END PRIVATE KEY-----\n", "")
                 .replace("\n", "")
 
-            // 1. Create JWT Header
             val header = JSONObject().apply {
                 put("alg", "RS256")
                 put("typ", "JWT")
             }.toString().let { Base64.encodeToString(it.toByteArray(), Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP) }
 
-            // 2. Create JWT Claim Set
             val now = System.currentTimeMillis() / 1000
             val claimSet = JSONObject().apply {
                 put("iss", clientEmail)
@@ -244,7 +228,6 @@ class MainActivity : AppCompatActivity() {
 
             val unsignedJwt = "$header.$claimSet"
 
-            // 3. Sign JWT
             val keyBytes = Base64.decode(privateKeyString, Base64.DEFAULT)
             val keySpec = PKCS8EncodedKeySpec(keyBytes)
             val kf = KeyFactory.getInstance("RSA")
@@ -258,7 +241,6 @@ class MainActivity : AppCompatActivity() {
             val signatureBase64 = Base64.encodeToString(signedBytes, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
             val jwt = "$unsignedJwt.$signatureBase64"
 
-            // 4. Exchange JWT for Access Token
             val formBody = FormBody.Builder()
                 .add("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer")
                 .add("assertion", jwt)
@@ -318,7 +300,6 @@ class MainActivity : AppCompatActivity() {
 
         CoroutineScope(Dispatchers.Main).launch { Toast.makeText(this@MainActivity, "Uploading $fileName...", Toast.LENGTH_SHORT).show() }
         
-        // Push Directly to the provided Target Folder ID
         val metadata = JSONObject().apply {
             put("name", fileName)
             put("parents", org.json.JSONArray().put(TARGET_DRIVE_FOLDER_ID))
@@ -364,7 +345,6 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, "Opening attachment...", Toast.LENGTH_SHORT).show()
     }
 
-    // --- Search Logic ---
     private fun closeSearch(container: LinearLayout, input: EditText) {
         container.visibility = View.GONE
         currentSearchQuery = ""
@@ -407,7 +387,6 @@ class MainActivity : AppCompatActivity() {
         if (wrapperLayout != null) chatScrollView.post { chatScrollView.smoothScrollTo(0, wrapperLayout.top) }
     }
 
-    // --- ENCRYPTION ---
     private fun getSecretKey(): SecretKeySpec {
         val digest = MessageDigest.getInstance("SHA-256")
         val keyBytes = digest.digest(BuildConfig.ENCRYPTION_KEY.toByteArray(Charsets.UTF_8))
@@ -425,10 +404,9 @@ class MainActivity : AppCompatActivity() {
             val cipher = Cipher.getInstance("AES/ECB/PKCS5Padding")
             cipher.init(Cipher.DECRYPT_MODE, getSecretKey())
             String(cipher.doFinal(Base64.decode(encryptedMessage, Base64.DEFAULT)), Charsets.UTF_8)
-        } catch (e: Exception) { "🔒 [Decryption Failed]" }
+        } catch (e: Exception) { "ðŸ”’ [Decryption Failed]" }
     }
 
-    // --- NOTIFICATIONS & NETWORK ---
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(CHANNEL_ID, "Communique Chat", NotificationManager.IMPORTANCE_HIGH)
@@ -514,7 +492,6 @@ class MainActivity : AppCompatActivity() {
         userCountText.text = "${chatHistory.map { it.device }.distinct().size} users"
     }
 
-    // --- CHAT UI ---
     private fun updateChatUI() {
         chatMessageContainer.removeAllViews()
         val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
@@ -576,30 +553,28 @@ class MainActivity : AppCompatActivity() {
             }
 
             val decryptedText = decryptMessage(msg.message)
-        
-        // Ensure TextView is constructed safely outside scope effects
-        val messageView = TextView(this).apply {
-            textSize = 16f
-            setTextColor(Color.BLACK)
-        }
-           
-        // Keep the condition completely out of apply 
-        if (currentSearchQuery.isNotEmpty() && decryptedText.contains(currentSearchQuery, ignoreCase = true)) {
-            val spannable = SpannableString(decryptedText)
-            val startPos = decryptedText.indexOf(currentSearchQuery, ignoreCase = true)
-            val isFocusedMatch = searchMatchIndices.isNotEmpty() && currentSearchIndex >= 0 && searchMatchIndices[currentSearchIndex] == index
-            val highlightColor = if (isFocusedMatch) Color.parseColor("#FF9800") else Color.YELLOW
-            val textColor = if (isFocusedMatch) Color.WHITE else Color.BLACK
 
-            spannable.setSpan(BackgroundColorSpan(highlightColor), startPos, startPos + currentSearchQuery.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-            spannable.setSpan(ForegroundColorSpan(textColor), startPos, startPos + currentSearchQuery.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-            
-            messageView.text = spannable
-        } else {
-            messageView.text = decryptedText
-        }
+            val messageView = TextView(this).apply {
+                textSize = 16f
+                setTextColor(Color.BLACK)
+            }
 
-        bubbleLayout.addView(messageView)
+            val spannableText = if (currentSearchQuery.isNotEmpty() && decryptedText.contains(currentSearchQuery, ignoreCase = true)) {
+                val spannable = SpannableString(decryptedText)
+                val startPos = decryptedText.indexOf(currentSearchQuery, ignoreCase = true)
+                val isFocusedMatch = searchMatchIndices.isNotEmpty() && currentSearchIndex >= 0 && searchMatchIndices[currentSearchIndex] == index
+                val highlightColor = if (isFocusedMatch) Color.parseColor("#FF9800") else Color.YELLOW
+                val textColor = if (isFocusedMatch) Color.WHITE else Color.BLACK
+
+                spannable.setSpan(BackgroundColorSpan(highlightColor), startPos, startPos + currentSearchQuery.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                spannable.setSpan(ForegroundColorSpan(textColor), startPos, startPos + currentSearchQuery.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                spannable
+            } else {
+                SpannableString(decryptedText)
+            }
+
+            messageView.text = spannableText
+            bubbleLayout.addView(messageView)
 
             bubbleLayout.addView(TextView(this).apply {
                 text = timeFormat.format(Date(msg.timestamp))
