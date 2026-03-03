@@ -576,26 +576,30 @@ class MainActivity : AppCompatActivity() {
             }
 
             val decryptedText = decryptMessage(msg.message)
-            val messageView = TextView(this).apply {
-                textSize = 16f
-                setTextColor(Color.BLACK)
-            }
+        
+        // Ensure TextView is constructed safely outside scope effects
+        val messageView = TextView(this).apply {
+            textSize = 16f
+            setTextColor(Color.BLACK)
+        }
+           
+        // Keep the condition completely out of apply 
+        if (currentSearchQuery.isNotEmpty() && decryptedText.contains(currentSearchQuery, ignoreCase = true)) {
+            val spannable = SpannableString(decryptedText)
+            val startPos = decryptedText.indexOf(currentSearchQuery, ignoreCase = true)
+            val isFocusedMatch = searchMatchIndices.isNotEmpty() && currentSearchIndex >= 0 && searchMatchIndices[currentSearchIndex] == index
+            val highlightColor = if (isFocusedMatch) Color.parseColor("#FF9800") else Color.YELLOW
+            val textColor = if (isFocusedMatch) Color.WHITE else Color.BLACK
 
-            if (currentSearchQuery.isNotEmpty() && decryptedText.contains(currentSearchQuery, ignoreCase = true)) {
-                val spannable = SpannableString(decryptedText)
-                val startPos = decryptedText.indexOf(currentSearchQuery, ignoreCase = true)
-                val isFocusedMatch = searchMatchIndices.isNotEmpty() && currentSearchIndex >= 0 && searchMatchIndices[currentSearchIndex] == index
-                val highlightColor = if (isFocusedMatch) Color.parseColor("#FF9800") else Color.YELLOW
-                val textColor = if (isFocusedMatch) Color.WHITE else Color.BLACK
+            spannable.setSpan(BackgroundColorSpan(highlightColor), startPos, startPos + currentSearchQuery.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+            spannable.setSpan(ForegroundColorSpan(textColor), startPos, startPos + currentSearchQuery.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+            
+            messageView.text = spannable
+        } else {
+            messageView.text = decryptedText
+        }
 
-                spannable.setSpan(BackgroundColorSpan(highlightColor), startPos, startPos + currentSearchQuery.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-                spannable.setSpan(ForegroundColorSpan(textColor), startPos, startPos + currentSearchQuery.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-                messageView.text = spannable
-            } else {
-                messageView.text = decryptedText
-            }
-
-            bubbleLayout.addView(messageView)
+        bubbleLayout.addView(messageView)
 
             bubbleLayout.addView(TextView(this).apply {
                 text = timeFormat.format(Date(msg.timestamp))
