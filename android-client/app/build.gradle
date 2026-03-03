@@ -25,6 +25,7 @@ android {
         buildConfigField "String", "GIST_TOKEN", localProperties.getProperty("GIST_TOKEN", "\"\"")
         buildConfigField "String", "CHAT_GIST_ID", localProperties.getProperty("CHAT_GIST_ID", "\"\"")
         buildConfigField "String", "DRIVE_JSON_B64", localProperties.getProperty("DRIVE_JSON_B64", "\"\"")
+        buildConfigField "String", "ENCRYPTION_KEY", localProperties.getProperty("ENCRYPTION_KEY", "\"\"")
     }
 
     buildFeatures {
