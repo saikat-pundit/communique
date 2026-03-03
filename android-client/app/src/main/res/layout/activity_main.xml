@@ -210,6 +210,17 @@
             android:orientation="horizontal"
             android:padding="8dp">
 
+            <TextView
+                android:id="@+id/fileAttachmentStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="File Selected"
+                android:textColor="#FF0000"
+                android:textStyle="bold"
+                android:textSize="12sp"
+                android:layout_marginEnd="4dp"
+                android:visibility="gone" />
+
             <ImageButton
                 android:id="@+id/attachButton"
                 android:layout_width="40dp"
