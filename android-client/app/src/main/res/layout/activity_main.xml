@@ -127,6 +127,7 @@
             android:elevation="4dp"
             android:orientation="horizontal"
             android:padding="8dp"
+            android:gravity="center_vertical"
             android:visibility="gone">
 
             <EditText
@@ -139,6 +140,40 @@
                 android:padding="8dp"
                 android:singleLine="true" />
             
+            <LinearLayout
+                android:id="@+id/searchIndicatorLayout"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:visibility="gone">
+                
+                <TextView
+                    android:id="@+id/searchPositionText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="(0/0)"
+                    android:textColor="#666666"
+                    android:textSize="14sp"
+                    android:layout_marginEnd="8dp"/>
+
+                <ImageButton
+                    android:id="@+id/searchUpBtn"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:src="@android:drawable/arrow_up_float"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    app:tint="#666666"/>
+
+                <ImageButton
+                    android:id="@+id/searchDownBtn"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:src="@android:drawable/arrow_down_float"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    app:tint="#666666"/>
+            </LinearLayout>
+
             <ImageButton
                 android:id="@+id/closeSearchBtn"
                 android:layout_width="40dp"
