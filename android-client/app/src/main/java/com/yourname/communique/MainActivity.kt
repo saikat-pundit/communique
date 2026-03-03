@@ -525,62 +525,61 @@ class MainActivity : AppCompatActivity() {
         userCountText.text = "${chatHistory.map { it.device }.distinct().size} users"
     }
 
-    private fun updateChatUI() {
+        private fun updateChatUI() {
         chatMessageContainer.removeAllViews()
         val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
 
         for ((index, msg) in chatHistory.withIndex()) {
             val isMe = msg.device == currentDeviceName
-            val bubbleShape = GradientDrawable().apply {
-                cornerRadius = 48f
-                if (isMe) {
-                    setColor(Color.parseColor("#DCF8C6"))
-                } else {
-                    setColor(Color.parseColor("#FFFFFF"))
-                }
+            
+            val bubbleShape = GradientDrawable()
+            bubbleShape.cornerRadius = 48f
+            if (isMe) {
+                bubbleShape.setColor(Color.parseColor("#DCF8C6"))
+            } else {
+                bubbleShape.setColor(Color.parseColor("#FFFFFF"))
             }
 
-            val bubbleLayout = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                background = bubbleShape
-                setPadding(40, 32, 40, 32)
-                elevation = 4f
-            }
+            val bubbleLayout = LinearLayout(this)
+            bubbleLayout.orientation = LinearLayout.VERTICAL
+            bubbleLayout.background = bubbleShape
+            bubbleLayout.setPadding(40, 32, 40, 32)
+            bubbleLayout.elevation = 4f
 
             if (!isMe) {
-                bubbleLayout.addView(TextView(this).apply {
-                    text = msg.device
-                    textSize = 12f
-                    setTextColor(Color.parseColor("#007BFF"))
-                    setTypeface(null, Typeface.BOLD)
-                    setPadding(0, 0, 0, 8)
-                })
+                val deviceText = TextView(this)
+                deviceText.text = msg.device
+                deviceText.textSize = 12f
+                deviceText.setTextColor(Color.parseColor("#007BFF"))
+                deviceText.setTypeface(null, Typeface.BOLD)
+                deviceText.setPadding(0, 0, 0, 8)
+                bubbleLayout.addView(deviceText)
             }
 
             if (msg.driveFileId != null && msg.fileType != null) {
                 val decryptedFileId = decryptMessage(msg.driveFileId)
                 
-                val attachmentContainer = LinearLayout(this).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    gravity = Gravity.CENTER_VERTICAL
-                    setPadding(0, 8, 0, 16)
-                }
+                val attachmentContainer = LinearLayout(this)
+                attachmentContainer.orientation = LinearLayout.HORIZONTAL
+                attachmentContainer.gravity = Gravity.CENTER_VERTICAL
+                attachmentContainer.setPadding(0, 8, 0, 16)
 
-                val downloadIcon = ImageView(this).apply {
-                    setImageResource(android.R.drawable.stat_sys_download)
-                    setColorFilter(Color.parseColor("#075E54"))
-                    layoutParams = LinearLayout.LayoutParams(64, 64).apply { setMargins(0, 0, 16, 0) }
-                }
+                val downloadIcon = ImageView(this)
+                downloadIcon.setImageResource(android.R.drawable.stat_sys_download)
+                downloadIcon.setColorFilter(Color.parseColor("#075E54"))
+                val iconParams = LinearLayout.LayoutParams(64, 64)
+                iconParams.setMargins(0, 0, 16, 0)
+                downloadIcon.layoutParams = iconParams
 
-                val attachmentText = TextView(this).apply {
-                    if (msg.fileType?.startsWith("image/") == true) {
-                        text = "Image Attachment"
-                    } else {
-                        text = "Document Attachment"
-                    }
-                    textSize = 14f
-                    setTypeface(null, Typeface.BOLD)
-                    setTextColor(Color.parseColor("#075E54"))
+                val attachmentText = TextView(this)
+                attachmentText.textSize = 14f
+                attachmentText.setTypeface(null, Typeface.BOLD)
+                attachmentText.setTextColor(Color.parseColor("#075E54"))
+                
+                if (msg.fileType.startsWith("image/")) {
+                    attachmentText.text = "Image Attachment"
+                } else {
+                    attachmentText.text = "Document Attachment"
                 }
 
                 attachmentContainer.addView(downloadIcon)
@@ -595,27 +594,17 @@ class MainActivity : AppCompatActivity() {
 
             val decryptedText = decryptMessage(msg.message)
 
-            val messageView = TextView(this).apply {
-                textSize = 16f
-                setTextColor(Color.BLACK)
-            }
+            val messageView = TextView(this)
+            messageView.textSize = 16f
+            messageView.setTextColor(Color.BLACK)
 
             if (currentSearchQuery.isNotEmpty() && decryptedText.contains(currentSearchQuery, ignoreCase = true)) {
                 val spannable = SpannableString(decryptedText)
                 val startPos = decryptedText.indexOf(currentSearchQuery, ignoreCase = true)
                 val isFocusedMatch = searchMatchIndices.isNotEmpty() && currentSearchIndex >= 0 && searchMatchIndices[currentSearchIndex] == index
                 
-                val highlightColor = if (isFocusedMatch) {
-                    Color.parseColor("#FF9800")
-                } else {
-                    Color.YELLOW
-                }
-                
-                val textColor = if (isFocusedMatch) {
-                    Color.WHITE
-                } else {
-                    Color.BLACK
-                }
+                val highlightColor = if (isFocusedMatch) Color.parseColor("#FF9800") else Color.YELLOW
+                val textColor = if (isFocusedMatch) Color.WHITE else Color.BLACK
 
                 spannable.setSpan(BackgroundColorSpan(highlightColor), startPos, startPos + currentSearchQuery.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
                 spannable.setSpan(ForegroundColorSpan(textColor), startPos, startPos + currentSearchQuery.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
@@ -626,25 +615,31 @@ class MainActivity : AppCompatActivity() {
 
             bubbleLayout.addView(messageView)
 
-            bubbleLayout.addView(TextView(this).apply {
-                text = timeFormat.format(Date(msg.timestamp))
-                textSize = 10f
-                setTextColor(Color.GRAY)
-                setTypeface(null, Typeface.ITALIC)
-                gravity = Gravity.END
-                setPadding(0, 12, 0, 0)
-            })
+            val timeText = TextView(this)
+            timeText.text = timeFormat.format(Date(msg.timestamp))
+            timeText.textSize = 10f
+            timeText.setTextColor(Color.GRAY)
+            timeText.setTypeface(null, Typeface.ITALIC)
+            timeText.gravity = Gravity.END
+            timeText.setPadding(0, 12, 0, 0)
+            bubbleLayout.addView(timeText)
 
-            val wrapper = LinearLayout(this).apply {
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, 12, 0, 12) }
-                if (isMe) {
-                    gravity = Gravity.END
-                    setPadding(150, 0, 0, 0)
-                } else {
-                    gravity = Gravity.START
-                    setPadding(0, 0, 150, 0)
-                }
+            val wrapper = LinearLayout(this)
+            val wrapperParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            wrapperParams.setMargins(0, 12, 0, 12)
+            wrapper.layoutParams = wrapperParams
+            
+            if (isMe) {
+                wrapper.gravity = Gravity.END
+                wrapper.setPadding(150, 0, 0, 0)
+            } else {
+                wrapper.gravity = Gravity.START
+                wrapper.setPadding(0, 0, 150, 0)
             }
+            
             wrapper.addView(bubbleLayout)
             chatMessageContainer.addView(wrapper)
         }
