@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:gravity="center">
+
+    <EditText
+        android:id="@+id/messageInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Type a message to Ubuntu..."
+        android:minLines="3"
+        android:gravity="top|start"
+        android:inputType="textMultiLine" />
+
+    <Button
+        android:id="@+id/pickFileButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="1. Attach a File (Optional)" />
+
+    <TextView
+        android:id="@+id/selectedFileText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="No file selected"
+        android:textAlignment="center"
+        android:paddingTop="8dp"
+        android:textColor="#888888"/>
+
+    <Button
+        android:id="@+id/sendButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:text="2. Send to Desktop"
+        android:backgroundTint="#4CAF50" />
+
+</LinearLayout>
