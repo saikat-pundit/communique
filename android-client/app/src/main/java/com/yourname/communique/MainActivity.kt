@@ -329,7 +329,7 @@ class MainActivity : AppCompatActivity() {
             .post(requestBody)
             .build()
 
-        try {
+                try {
             httpClient.newCall(request).execute().use { response ->
                 if (response.isSuccessful) {
                     val respString = response.body?.string()
@@ -338,6 +338,10 @@ class MainActivity : AppCompatActivity() {
                         val uiText = messageInput.text.toString().ifEmpty { "Sent an attachment" }
                         CoroutineScope(Dispatchers.Main).launch { messageInput.text.clear() }
                         sendMessage(uiText, fileId, finalMimeType)
+                    } else {
+                        CoroutineScope(Dispatchers.Main).launch { 
+                            Toast.makeText(this@MainActivity, "Empty response from server", Toast.LENGTH_SHORT).show() 
+                        }
                     }
                 } else {
                     CoroutineScope(Dispatchers.Main).launch { Toast.makeText(this@MainActivity, "Upload Failed", Toast.LENGTH_SHORT).show() }
