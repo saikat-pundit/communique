@@ -552,7 +552,7 @@ class MainActivity : AppCompatActivity() {
                 bubbleLayout.addView(attachmentContainer)
             }
 
-            val decryptedText = decryptMessage(msg.message)
+                        val decryptedText = decryptMessage(msg.message)
 
             val messageView = TextView(this).apply {
                 textSize = 16f
@@ -560,15 +560,15 @@ class MainActivity : AppCompatActivity() {
             }
 
             val spannableText = if (currentSearchQuery.isNotEmpty() && decryptedText.contains(currentSearchQuery, ignoreCase = true)) {
-                val spannable = SpannableString(decryptedText)
-                val startPos = decryptedText.indexOf(currentSearchQuery, ignoreCase = true)
-                val isFocusedMatch = searchMatchIndices.isNotEmpty() && currentSearchIndex >= 0 && searchMatchIndices[currentSearchIndex] == index
-                val highlightColor = if (isFocusedMatch) Color.parseColor("#FF9800") else Color.YELLOW
-                val textColor = if (isFocusedMatch) Color.WHITE else Color.BLACK
+                SpannableString(decryptedText).apply {
+                    val startPos = decryptedText.indexOf(currentSearchQuery, ignoreCase = true)
+                    val isFocusedMatch = searchMatchIndices.isNotEmpty() && currentSearchIndex >= 0 && searchMatchIndices[currentSearchIndex] == index
+                    val highlightColor = if (isFocusedMatch) Color.parseColor("#FF9800") else Color.YELLOW
+                    val textColor = if (isFocusedMatch) Color.WHITE else Color.BLACK
 
-                spannable.setSpan(BackgroundColorSpan(highlightColor), startPos, startPos + currentSearchQuery.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-                spannable.setSpan(ForegroundColorSpan(textColor), startPos, startPos + currentSearchQuery.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-                spannable
+                    setSpan(BackgroundColorSpan(highlightColor), startPos, startPos + currentSearchQuery.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    setSpan(ForegroundColorSpan(textColor), startPos, startPos + currentSearchQuery.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                }
             } else {
                 SpannableString(decryptedText)
             }
