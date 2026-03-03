@@ -1,4 +1,54 @@
 plugins {
-    id 'com.android.application' version '8.2.2' apply false
-    id 'org.jetbrains.kotlin.android' version '1.9.22' apply false
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+// Read the secure properties from the file GitHub Actions creates
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localProperties.load(new FileInputStream(localPropertiesFile))
+}
+
+android {
+    namespace 'com.yourname.communique'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.yourname.communique"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+
+        // Inject the secrets into Kotlin securely
+        buildConfigField "String", "GIST_TOKEN", localProperties.getProperty("GIST_TOKEN", "\"\"")
+        buildConfigField "String", "CHAT_GIST_ID", localProperties.getProperty("CHAT_GIST_ID", "\"\"")
+        buildConfigField "String", "DRIVE_JSON_B64", localProperties.getProperty("DRIVE_JSON_B64", "\"\"")
+    }
+
+    buildFeatures {
+        buildConfig true // This generates the BuildConfig.java class
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
 }
