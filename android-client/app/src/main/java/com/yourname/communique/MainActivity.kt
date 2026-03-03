@@ -11,6 +11,11 @@ import android.graphics.drawable.GradientDrawable
 import android.media.RingtoneManager
 import android.os.Build
 import android.os.Bundle
+import android.text.Editable
+import android.text.Spannable
+import android.text.SpannableString
+import android.text.TextWatcher
+import android.text.style.BackgroundColorSpan
 import android.util.Base64
 import android.view.Gravity
 import android.view.View
@@ -43,15 +48,19 @@ class MainActivity : AppCompatActivity() {
     private var isPolling = false
     private var isFirstLoad = true
     private val CHANNEL_ID = "communique_chat"
+    
+    // --- Search State Variables ---
+    private var currentSearchQuery = ""
 
     private lateinit var chatMessageContainer: LinearLayout
     private lateinit var chatScrollView: ScrollView
+    private lateinit var userCountText: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Request Notification Permissions (Android 13+)
+        // Request Notification Permissions
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 101)
@@ -62,8 +71,9 @@ class MainActivity : AppCompatActivity() {
         val manufacturer = Build.MANUFACTURER.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
         currentDeviceName = "$manufacturer ${Build.MODEL}"
 
+        // --- View Bindings ---
         val loginLayout = findViewById<LinearLayout>(R.id.loginLayout)
-        val chatLayout = findViewById<LinearLayout>(R.id.chatLayout)
+        val chatLayout = findViewById<RelativeLayout>(R.id.chatLayout)
         val loginTriggerButton = findViewById<Button>(R.id.loginTriggerButton)
         val pinContainer = findViewById<LinearLayout>(R.id.pinContainer)
         val pinInput = findViewById<EditText>(R.id.pinInput)
@@ -72,6 +82,13 @@ class MainActivity : AppCompatActivity() {
         val detectedDeviceText = findViewById<TextView>(R.id.detectedDeviceText)
         val gifImageView = findViewById<ImageView>(R.id.loginGif)
         
+        // Search Bindings
+        userCountText = findViewById(R.id.userCountText)
+        val searchIcon = findViewById<ImageView>(R.id.searchIcon)
+        val searchContainer = findViewById<LinearLayout>(R.id.searchContainer)
+        val searchInput = findViewById<EditText>(R.id.searchInput)
+        val closeSearchBtn = findViewById<ImageButton>(R.id.closeSearchBtn)
+        
         chatMessageContainer = findViewById(R.id.chatMessageContainer)
         chatScrollView = findViewById(R.id.chatScrollView)
 
@@ -79,6 +96,7 @@ class MainActivity : AppCompatActivity() {
 
         try { Glide.with(this).asGif().load(R.drawable.login).into(gifImageView) } catch (e: Exception) {}
 
+        // --- Login Animations ---
         loginTriggerButton.setOnClickListener {
             loginTriggerButton.animate().alpha(0f).setDuration(300).withEndAction {
                 loginTriggerButton.visibility = View.GONE
@@ -101,6 +119,35 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // --- Search Interactions ---
+        searchIcon.setOnClickListener {
+            if (searchContainer.visibility == View.VISIBLE) {
+                searchContainer.visibility = View.GONE
+                currentSearchQuery = ""
+                searchInput.text.clear()
+                updateChatUI() // Redraw to clear highlights
+            } else {
+                searchContainer.visibility = View.VISIBLE
+                searchInput.requestFocus()
+            }
+        }
+        
+        closeSearchBtn.setOnClickListener {
+            searchContainer.visibility = View.GONE
+            currentSearchQuery = ""
+            searchInput.text.clear()
+            updateChatUI() // Redraw to clear highlights
+        }
+        
+        searchInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                currentSearchQuery = s.toString()
+                applySearchHighlight()
+            }
+        })
+
         findViewById<View>(R.id.sendButton).setOnClickListener {
             val text = messageInput.text.toString().trim()
             if (text.isNotEmpty()) {
@@ -111,6 +158,51 @@ class MainActivity : AppCompatActivity() {
                 chatHistory.add(newMessage)
                 updateChatUI()
                 CoroutineScope(Dispatchers.IO).launch { pushGistUpdate(chatHistory) }
+            }
+        }
+    }
+
+    // --- Search Logic ---
+    private fun applySearchHighlight() {
+        if (currentSearchQuery.isEmpty()) {
+            updateChatUI() 
+            return
+        }
+
+        var firstMatchFound = false
+
+        for ((index, msg) in chatHistory.withIndex()) {
+            val decryptedText = decryptMessage(msg.message)
+            if (decryptedText.contains(currentSearchQuery, ignoreCase = true)) {
+                
+                // Navigate our layout hierarchy to find the TextView containing the message
+                val wrapperLayout = chatMessageContainer.getChildAt(index) as? LinearLayout
+                val bubbleLayout = wrapperLayout?.getChildAt(0) as? LinearLayout
+                
+                for (i in 0 until (bubbleLayout?.childCount ?: 0)) {
+                   val view = bubbleLayout?.getChildAt(i)
+                   if(view is TextView && view.text.toString() == decryptedText) {
+                       val spannable = SpannableString(decryptedText)
+                       val startPos = decryptedText.indexOf(currentSearchQuery, ignoreCase = true)
+                       
+                       // Apply yellow highlight
+                       spannable.setSpan(
+                           BackgroundColorSpan(Color.YELLOW),
+                           startPos,
+                           startPos + currentSearchQuery.length,
+                           Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                       )
+                       view.text = spannable
+                       
+                       // Automatically scroll to the first match
+                       if(!firstMatchFound) {
+                           chatScrollView.post {
+                               chatScrollView.smoothScrollTo(0, wrapperLayout.top)
+                           }
+                           firstMatchFound = true
+                       }
+                   }
+                }
             }
         }
     }
@@ -139,9 +231,7 @@ class MainActivity : AppCompatActivity() {
     // --- NOTIFICATIONS & NETWORK ---
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(CHANNEL_ID, "Communique Chat", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "New message notifications"
-            }
+            val channel = NotificationChannel(CHANNEL_ID, "Communique Chat", NotificationManager.IMPORTANCE_HIGH)
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)
         }
@@ -156,7 +246,6 @@ class MainActivity : AppCompatActivity() {
             .setAutoCancel(true)
 
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
                 notificationManager.notify(System.currentTimeMillis().toInt(), builder.build())
@@ -177,7 +266,7 @@ class MainActivity : AppCompatActivity() {
         CoroutineScope(Dispatchers.IO).launch {
             while (isPolling) {
                 fetchGist()
-                delay(2000)
+                delay(5000)
             }
         }
     }
@@ -196,7 +285,6 @@ class MainActivity : AppCompatActivity() {
                     val fetchedHistory: List<ChatMessage> = gson.fromJson(content, object : TypeToken<List<ChatMessage>>() {}.type) ?: emptyList()
 
                     if (fetchedHistory.size > chatHistory.size) {
-                        // Find the very last message in the new batch
                         val lastMessage = fetchedHistory.last()
                         val isMe = lastMessage.device == currentDeviceName
                         
@@ -205,8 +293,8 @@ class MainActivity : AppCompatActivity() {
                         
                         CoroutineScope(Dispatchers.Main).launch { 
                             updateChatUI()
+                            updateUserCount() // Refresh the user count
                             
-                            // If it's NOT the first load, and the message is NOT from me, trigger alerts
                             if (!isFirstLoad && !isMe) {
                                 playNotificationSound()
                                 showNotification(lastMessage.device, decryptMessage(lastMessage.message))
@@ -215,6 +303,7 @@ class MainActivity : AppCompatActivity() {
                         }
                     } else if (isFirstLoad) {
                         isFirstLoad = false
+                        CoroutineScope(Dispatchers.Main).launch { updateUserCount() }
                     }
                 }
             }
@@ -235,7 +324,12 @@ class MainActivity : AppCompatActivity() {
         try { httpClient.newCall(request).execute().close() } catch (e: Exception) {}
     }
 
-    // --- CHAT UI ---
+    // --- UI HELPERS ---
+    private fun updateUserCount() {
+        val uniqueDevices = chatHistory.map { it.device }.distinct().size
+        userCountText.text = "$uniqueDevices users"
+    }
+
     private fun updateChatUI() {
         chatMessageContainer.removeAllViews()
         val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
@@ -289,6 +383,11 @@ class MainActivity : AppCompatActivity() {
             wrapper.addView(bubbleLayout)
             chatMessageContainer.addView(wrapper)
         }
-        chatScrollView.post { chatScrollView.smoothScrollTo(0, chatMessageContainer.bottom) }
+        
+        if(currentSearchQuery.isEmpty()) {
+            chatScrollView.post { chatScrollView.smoothScrollTo(0, chatMessageContainer.bottom) }
+        } else {
+            applySearchHighlight()
+        }
     }
 }
