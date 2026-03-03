@@ -36,14 +36,51 @@ jobs:
         cp android-client/login.gif android-client/app/src/main/res/drawable/login.gif 2>/dev/null || :
         cp android-client/wallpaper.png android-client/app/src/main/res/drawable/wallpaper.png 2>/dev/null || :
 
-    - name: Build Debug APK
-      run: gradle assembleDebug --stacktrace
-      working-directory: ./android-client
+    - name: Build Debug APK with Detailed Logs
+      run: |
+        # Run gradle with maximum logging and capture output
+        cd android-client
+        gradle assembleDebug --stacktrace --info --no-daemon 2>&1 | tee build_log.txt
+      continue-on-error: true
 
-    - name: Rename APK
+    - name: Extract Error Context
+      if: always()
+      run: |
+        echo "=== ERROR CONTEXT ==="
+        # Extract lines around the error
+        grep -B 10 -A 10 "e: file://" android-client/build_log.txt || echo "No Kotlin errors found"
+        echo ""
+        echo "=== LINE 336 CONTEXT ==="
+        # Show the specific lines around line 336 in MainActivity.kt
+        if [ -f "android-client/app/src/main/java/com/yourname/communique/MainActivity.kt" ]; then
+          cat -n android-client/app/src/main/java/com/yourname/communique/MainActivity.kt | grep -A 15 -B 5 " 336 " || echo "Line 336 not found"
+        fi
+        echo ""
+        echo "=== FULL KOTLIN COMPILER ERRORS ==="
+        grep -A 5 "e: file://" android-client/build_log.txt || echo "No Kotlin errors"
+
+    - name: Upload Build Logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-logs
+        path: |
+          android-client/build_log.txt
+          android-client/app/build/reports/
+
+    - name: Upload Source File
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: MainActivity-source
+        path: android-client/app/src/main/java/com/yourname/communique/MainActivity.kt
+
+    - name: Rename APK (if build succeeded)
+      if: success()
       run: mv android-client/app/build/outputs/apk/debug/app-debug.apk android-client/app/build/outputs/apk/debug/communique.apk
 
     - name: Upload APK Artifact
+      if: success()
       uses: actions/upload-artifact@v4
       with:
         name: communique
