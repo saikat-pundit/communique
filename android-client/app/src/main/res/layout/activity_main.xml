@@ -16,10 +16,14 @@
 
         <com.google.android.material.imageview.ShapeableImageView
             android:id="@+id/loginGif"
-            android:layout_width="120dp"
-            android:layout_height="120dp"
+            android:layout_width="160dp"
+            android:layout_height="160dp"
             android:scaleType="centerCrop"
             android:layout_marginBottom="24dp"
+            android:padding="6dp"
+            android:background="#FAFAFA"
+            app:strokeWidth="3dp"
+            app:strokeColor="#E0E0E0"
             app:shapeAppearanceOverlay="@style/CircleStyle"
             android:elevation="8dp"/>
 
@@ -45,7 +49,9 @@
             android:id="@+id/loginTriggerButton"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:text="Login"
+            android:text="Enter PIN"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
             android:textSize="18sp"
             android:backgroundTint="#000000" />
 
@@ -71,6 +77,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
                 android:text="Unlock"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:textSize="18sp"
                 android:backgroundTint="#007BFF" />
         </LinearLayout>
     </LinearLayout>
