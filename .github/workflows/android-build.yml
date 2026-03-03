@@ -20,7 +20,18 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
       with:
-        gradle-version: '8.4' # <--- THIS IS THE MAGIC FIX
+        gradle-version: '8.4'
+
+    # --- NEW STEP TO INJECT SECRETS SAFELY ---
+    - name: Create local.properties
+      run: |
+        echo "GIST_TOKEN=\"${{ secrets.GIST_TOKEN }}\"" >> android-client/local.properties
+        echo "CHAT_GIST_ID=\"${{ secrets.CHAT_GIST_ID }}\"" >> android-client/local.properties
+        echo "DRIVE_JSON_B64=\"${{ secrets.DRIVE_JSON_B64 }}\"" >> android-client/local.properties
+
+    - name: Build Debug APK
+      run: gradle assembleDebug
+      working-directory: ./android-client
 
     - name: Build Debug APK
       run: gradle assembleDebug
