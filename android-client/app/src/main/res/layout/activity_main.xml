@@ -184,60 +184,61 @@
         </LinearLayout>
 
         <ScrollView
-            android:id="@+id/chatScrollView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_above="@+id/inputContainer"
-            android:layout_below="@+id/searchContainer"
-            android:clipToPadding="false"
-            android:padding="12dp">
-            
-            <LinearLayout
-                android:id="@+id/chatMessageContainer"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical" />
-        </ScrollView>
+android:id="@+id/chatScrollView"
+android:layout_width="match_parent"
+android:layout_height="match_parent"
+android:layout_above="@+id/inputContainer"
+android:layout_below="@+id/searchContainer"
+android:clipToPadding="false"
+android:padding="12dp">
 
         <LinearLayout
-            android:id="@+id/inputContainer"
+            android:id="@+id/chatMessageContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_alignParentBottom="true"
-            android:background="#EFF2F5"
-            android:elevation="16dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:padding="8dp">
+            android:orientation="vertical" />
+    </ScrollView>
 
-            <ImageButton
-                android:id="@+id/attachButton"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_marginEnd="8dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@android:drawable/ic_menu_add"
-                app:tint="#666666" />
+    <LinearLayout
+        android:id="@+id/inputContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:background="#EFF2F5"
+        android:elevation="16dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="8dp">
 
-            <EditText
-                android:id="@+id/messageInput"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:background="@android:color/transparent"
-                android:hint="Type a message..."
-                android:padding="16dp"
-                android:textSize="16sp" />
+        <ImageButton
+            android:id="@+id/attachButton"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginEnd="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_add"
+            app:tint="#666666" />
 
-            <com.google.android.material.floatingactionbutton.FloatingActionButton
-                android:id="@+id/sendButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:src="@drawable/ic_send"
-                app:backgroundTint="#007BFF"
-                app:fabSize="mini"
-                app:tint="#FFFFFF" />
-        </LinearLayout>
-    </RelativeLayout>
+        <EditText
+            android:id="@+id/messageInput"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@android:color/transparent"
+            android:hint="Type a message..."
+            android:padding="16dp"
+            android:textSize="16sp" />
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/sendButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:src="@drawable/ic_send"
+            app:backgroundTint="#007BFF"
+            app:fabSize="mini"
+            app:tint="#FFFFFF" />
+    </LinearLayout>
+</RelativeLayout>
+
 </FrameLayout>
