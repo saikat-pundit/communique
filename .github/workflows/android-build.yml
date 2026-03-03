@@ -1,7 +1,7 @@
 name: Android CI Build
 
 on:
-  workflow_dispatch: # Allows you to run it manually!
+  workflow_dispatch:
 
 jobs:
   build:
@@ -22,20 +22,29 @@ jobs:
       with:
         gradle-version: '8.4'
 
-    # --- NEW STEP TO INJECT SECRETS SAFELY ---
-    - name: Create local.properties
+    - name: Prepare Assets & Inject Secrets
       run: |
+        # Inject Secrets
         echo "GIST_TOKEN=\"${{ secrets.GIST_TOKEN }}\"" >> android-client/local.properties
         echo "CHAT_GIST_ID=\"${{ secrets.CHAT_GIST_ID }}\"" >> android-client/local.properties
         echo "DRIVE_JSON_B64=\"${{ secrets.DRIVE_JSON_B64 }}\"" >> android-client/local.properties
         echo "ENCRYPTION_KEY=\"${{ secrets.ENCRYPTION_KEY }}\"" >> android-client/local.properties
+        
+        # Move user images into the Android drawable folder safely
+        mkdir -p android-client/app/src/main/res/drawable
+        cp android-client/logo.png android-client/app/src/main/res/drawable/logo.png 2>/dev/null || :
+        cp android-client/login.gif android-client/app/src/main/res/drawable/login.gif 2>/dev/null || :
+        cp android-client/wallpaper.png android-client/app/src/main/res/drawable/wallpaper.png 2>/dev/null || :
 
     - name: Build Debug APK
       run: gradle assembleDebug
       working-directory: ./android-client
 
+    - name: Rename APK
+      run: mv android-client/app/build/outputs/apk/debug/app-debug.apk android-client/app/build/outputs/apk/debug/communique.apk
+
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: communique-app
-        path: android-client/app/build/outputs/apk/debug/app-debug.apk
+        name: communique
+        path: android-client/app/build/outputs/apk/debug/communique.apk
