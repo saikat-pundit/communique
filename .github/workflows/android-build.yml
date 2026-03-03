@@ -28,6 +28,7 @@ jobs:
         echo "GIST_TOKEN=\"${{ secrets.GIST_TOKEN }}\"" >> android-client/local.properties
         echo "CHAT_GIST_ID=\"${{ secrets.CHAT_GIST_ID }}\"" >> android-client/local.properties
         echo "DRIVE_JSON_B64=\"${{ secrets.DRIVE_JSON_B64 }}\"" >> android-client/local.properties
+        echo "ENCRYPTION_KEY=\"${{ secrets.ENCRYPTION_KEY }}\"" >> android-client/local.properties
 
     - name: Build Debug APK
       run: gradle assembleDebug
