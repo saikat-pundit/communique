@@ -78,23 +78,84 @@
         </LinearLayout>
     </LinearLayout>
 
-    <LinearLayout
+    <RelativeLayout
         android:id="@+id/chatLayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
         android:background="@drawable/wallpaper"
         android:visibility="gone"
         android:alpha="0">
 
+        <LinearLayout
+            android:id="@+id/topBanner"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_alignParentTop="true"
+            android:background="#075E54"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="16dp"
+            android:elevation="4dp">
+
+            <TextView
+                android:id="@+id/userCountText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="0 users connected"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <ImageView
+                android:id="@+id/searchIcon"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:src="@android:drawable/ic_menu_search"
+                app:tint="#FFFFFF"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/searchContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/topBanner"
+            android:background="#FFFFFF"
+            android:elevation="4dp"
+            android:orientation="horizontal"
+            android:padding="8dp"
+            android:visibility="gone">
+
+            <EditText
+                android:id="@+id/searchInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@android:color/transparent"
+                android:hint="Search messages..."
+                android:padding="8dp"
+                android:singleLine="true" />
+            
+            <ImageButton
+                android:id="@+id/closeSearchBtn"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@android:drawable/ic_menu_close_clear_cancel"
+                app:tint="#666666"/>
+        </LinearLayout>
+
         <ScrollView
             android:id="@+id/chatScrollView"
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:padding="12dp"
+            android:layout_height="match_parent"
+            android:layout_above="@+id/inputContainer"
+            android:layout_below="@+id/searchContainer"
             android:clipToPadding="false"
-            android:paddingBottom="80dp">
+            android:padding="12dp">
             
             <LinearLayout
                 android:id="@+id/chatMessageContainer"
@@ -104,34 +165,35 @@
         </ScrollView>
 
         <LinearLayout
+            android:id="@+id/inputContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:padding="8dp"
+            android:layout_alignParentBottom="true"
             android:background="#EFF2F5"
+            android:elevation="16dp"
             android:gravity="center_vertical"
-            android:elevation="16dp">
+            android:orientation="horizontal"
+            android:padding="8dp">
 
             <EditText
                 android:id="@+id/messageInput"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:hint="Type a message..."
                 android:background="@android:color/transparent"
+                android:hint="Type a message..."
                 android:padding="16dp"
-                android:textSize="16sp"/>
+                android:textSize="16sp" />
 
             <com.google.android.material.floatingactionbutton.FloatingActionButton
                 android:id="@+id/sendButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
                 android:src="@drawable/ic_send"
                 app:backgroundTint="#007BFF"
-                app:tint="#FFFFFF"
                 app:fabSize="mini"
-                android:layout_marginStart="8dp"/>
+                app:tint="#FFFFFF" />
         </LinearLayout>
-    </LinearLayout>
-
+    </RelativeLayout>
 </FrameLayout>
