@@ -20,7 +20,6 @@ data class ChatMessage(val device: String, val message: String, val timestamp: L
 
 class MainActivity : AppCompatActivity() {
 
-    private val client = OkHttp() // Fixed typo: should be OkHttpClient()
     private val httpClient = OkHttpClient()
     private val gson = Gson()
     private var currentDeviceName = ""
