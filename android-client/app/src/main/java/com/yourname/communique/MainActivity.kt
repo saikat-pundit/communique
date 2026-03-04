@@ -1,5 +1,6 @@
 package com.yourname.communique
-
+import org.json.JSONArray
+import kotlinx.coroutines.withContext
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -48,7 +49,7 @@ import java.util.*
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 
-data class ChatMessage(val device: String, val message: String, val timestamp: Long, val driveFileId: String? = null, val fileType: String? = null)
+data class ChatMessage(val device: String, val message: String, val timestamp: Long, val driveFileId: String? = null, val fileType: String? = null, val fileName: String? = null)
 
 class MainActivity : AppCompatActivity() {
 
@@ -200,15 +201,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun sendMessage(rawText: String, driveFileId: String?, fileType: String?) {
-        val encryptedText = encryptMessage(rawText)
-        val encryptedFileId = driveFileId?.let { encryptMessage(it) }
-        
-        val newMessage = ChatMessage(currentDeviceName, encryptedText, System.currentTimeMillis(), encryptedFileId, fileType)
-        chatHistory.add(newMessage)
-        CoroutineScope(Dispatchers.Main).launch { updateChatUI() }
-        CoroutineScope(Dispatchers.IO).launch { pushGistUpdate(chatHistory) }
-    }
+    private fun sendMessage(rawText: String, driveFileId: String? = null, fileType: String? = null, fileName: String? = null) {
+    val encryptedText = encryptMessage(rawText)
+    val encryptedFileId = driveFileId?.let { encryptMessage(it) }
+    
+    val newMessage = ChatMessage(currentDeviceName, encryptedText, System.currentTimeMillis(), encryptedFileId, fileType, fileName)
+    chatHistory.add(newMessage)
+    CoroutineScope(Dispatchers.Main).launch { updateChatUI() }
+    CoroutineScope(Dispatchers.IO).launch { pushGistUpdate(chatHistory) }
+}
 
     private suspend fun fetchDriveAccessToken() {
         try {
@@ -277,89 +278,136 @@ class MainActivity : AppCompatActivity() {
     }
 
     private suspend fun handleFileUpload(uri: Uri) {
-        if (googleDriveAccessToken == null) {
-            CoroutineScope(Dispatchers.Main).launch { Toast.makeText(this@MainActivity, "Drive Auth Failed. Cannot upload.", Toast.LENGTH_SHORT).show() }
-            return
-        }
-
-        val contentResolver = applicationContext.contentResolver
-        val mimeType = contentResolver.getType(uri) ?: "application/octet-stream"
-        
-        var fileName = "attachment"
-        contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-            if (cursor.moveToFirst()) fileName = cursor.getString(nameIndex)
-        }
-
-        var fileBytes = contentResolver.openInputStream(uri)?.readBytes() ?: return
-        var finalMimeType = mimeType
-
-        if (mimeType.startsWith("image/")) {
-            try {
-                val source = ImageDecoder.createSource(contentResolver, uri)
-                val bitmap = ImageDecoder.decodeBitmap(source)
-                val baos = ByteArrayOutputStream()
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    bitmap.compress(Bitmap.CompressFormat.WEBP_LOSSY, 80, baos)
-                } else {
-                    bitmap.compress(Bitmap.CompressFormat.WEBP, 80, baos)
+    withContext(Dispatchers.IO) {
+        try {
+            // Check if we have Drive access token
+            if (googleDriveAccessToken == null) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MainActivity, "Getting Drive access...", Toast.LENGTH_SHORT).show()
                 }
-                fileBytes = baos.toByteArray()
-                finalMimeType = "image/webp"
-                fileName = "${fileName.substringBeforeLast(".")}.webp"
-            } catch (e: Exception) { e.printStackTrace() }
-        }
-
-        CoroutineScope(Dispatchers.Main).launch { Toast.makeText(this@MainActivity, "Uploading $fileName...", Toast.LENGTH_SHORT).show() }
-        
-        val metadata = JSONObject().apply {
-            put("name", fileName)
-            put("parents", org.json.JSONArray().put(TARGET_DRIVE_FOLDER_ID))
-        }
-
-        val requestBody = MultipartBody.Builder()
-            .setType(MultipartBody.FORM)
-            .addFormDataPart("metadata", null, metadata.toString().toRequestBody("application/json".toMediaType()))
-            .addFormDataPart("file", fileName, fileBytes.toRequestBody(finalMimeType.toMediaType()))
-            .build()
-
-        val request = Request.Builder()
-            .url("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart")
-            .addHeader("Authorization", "Bearer $googleDriveAccessToken")
-            .post(requestBody)
-            .build()
-
-                try {
-            httpClient.newCall(request).execute().use { response ->
-                if (response.isSuccessful) {
-                    val respString = response.body?.string()
-                    if (respString != null) {
-                        val fileId = JSONObject(respString).getString("id")
-                        val uiText = messageInput.text.toString().ifEmpty { "Sent an attachment" }
-                        CoroutineScope(Dispatchers.Main).launch { messageInput.text.clear() }
-                        sendMessage(uiText, fileId, finalMimeType)
-                    } else {
-                        CoroutineScope(Dispatchers.Main).launch { 
-                            Toast.makeText(this@MainActivity, "Empty response from server", Toast.LENGTH_SHORT).show() 
-                        }
+                fetchDriveAccessToken()
+                if (googleDriveAccessToken == null) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "Drive Auth Failed", Toast.LENGTH_LONG).show()
                     }
+                    return@withContext
+                }
+            }
+
+            val contentResolver = applicationContext.contentResolver
+            val mimeType = contentResolver.getType(uri) ?: "application/octet-stream"
+            
+            // Get file name
+            var fileName = "file_${System.currentTimeMillis()}"
+            contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (cursor.moveToFirst()) {
+                    fileName = cursor.getString(nameIndex)
+                }
+            }
+
+            // Check file size (10MB limit)
+            val fileSize = contentResolver.openInputStream(uri)?.available() ?: 0
+            if (fileSize > 10 * 1024 * 1024) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MainActivity, "File too large (max 10MB)", Toast.LENGTH_LONG).show()
+                }
+                return@withContext
+            }
+
+            // Read file
+            var fileBytes = contentResolver.openInputStream(uri)?.readBytes() ?: return@withContext
+            var finalMimeType = mimeType
+            var finalFileName = fileName
+
+            // Compress images if they're large
+            if (mimeType.startsWith("image/") && fileSize > 1024 * 1024) {
+                try {
+                    val source = ImageDecoder.createSource(contentResolver, uri)
+                    val bitmap = ImageDecoder.decodeBitmap(source)
+                    val baos = ByteArrayOutputStream()
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 80, baos)
+                    fileBytes = baos.toByteArray()
+                    finalMimeType = "image/jpeg"
+                    finalFileName = fileName.substringBeforeLast(".") + ".jpg"
+                } catch (e: Exception) { }
+            }
+
+            withContext(Dispatchers.Main) {
+                Toast.makeText(this@MainActivity, "Uploading $finalFileName...", Toast.LENGTH_SHORT).show()
+            }
+
+            // Simple metadata
+            val metadata = JSONObject().apply {
+                put("name", finalFileName)
+                put("parents", JSONArray().put(TARGET_DRIVE_FOLDER_ID))
+            }
+
+            // Build request (simpler way)
+            val requestBody = MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("metadata", null, metadata.toString().toRequestBody("application/json; charset=UTF-8".toMediaType()))
+                .addFormDataPart("file", finalFileName, fileBytes.toRequestBody(finalMimeType.toMediaType()))
+                .build()
+
+            val request = Request.Builder()
+                .url("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart")
+                .addHeader("Authorization", "Bearer $googleDriveAccessToken")
+                .post(requestBody)
+                .build()
+
+            httpClient.newCall(request).execute().use { response ->
+                val responseString = response.body?.string()
+                
+                if (response.isSuccessful && responseString != null) {
+                    val fileId = JSONObject(responseString).getString("id")
+                    
+                    // Make file public (so anyone can download)
+                    try {
+                        val permissionBody = JSONObject().apply {
+                            put("role", "reader")
+                            put("type", "anyone")
+                        }
+                        val permRequest = Request.Builder()
+                            .url("https://www.googleapis.com/drive/v3/files/$fileId/permissions")
+                            .addHeader("Authorization", "Bearer $googleDriveAccessToken")
+                            .post(permissionBody.toString().toRequestBody("application/json".toMediaType()))
+                            .build()
+                        httpClient.newCall(permRequest).execute().close()
+                    } catch (e: Exception) { }
+                    
+                    val text = messageInput.text.toString().ifEmpty { "Sent a file" }
+                    
+                    withContext(Dispatchers.Main) {
+                        messageInput.text.clear()
+                        Toast.makeText(this@MainActivity, "Upload complete!", Toast.LENGTH_SHORT).show()
+                    }
+                    
+                    sendMessage(text, fileId, finalMimeType, finalFileName)
+                    
                 } else {
-                    CoroutineScope(Dispatchers.Main).launch { Toast.makeText(this@MainActivity, "Upload Failed", Toast.LENGTH_SHORT).show() }
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "Upload failed (${response.code})", Toast.LENGTH_LONG).show()
+                    }
                 }
             }
         } catch (e: Exception) {
-            CoroutineScope(Dispatchers.Main).launch { Toast.makeText(this@MainActivity, "Network Error on Upload", Toast.LENGTH_SHORT).show() }
+            e.printStackTrace()
+            withContext(Dispatchers.Main) {
+                Toast.makeText(this@MainActivity, "Upload error: ${e.message}", Toast.LENGTH_LONG).show()
+            }
         }
     }
+}
 
-    private fun triggerDownload(fileId: String, fileName: String) {
-        val url = "https://drive.google.com/uc?export=download&id=$fileId"
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            data = Uri.parse(url)
-        }
-        startActivity(intent)
-        Toast.makeText(this, "Opening attachment...", Toast.LENGTH_SHORT).show()
+    private fun triggerDownload(fileId: String, fileName: String, fileType: String) {
+    val url = "https://drive.google.com/uc?export=download&id=$fileId"
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+        data = Uri.parse(url)
     }
+    startActivity(intent)
+    Toast.makeText(this, "Opening $fileName...", Toast.LENGTH_SHORT).show()
+}
 
     private fun closeSearch(container: LinearLayout, input: EditText) {
         container.visibility = View.GONE
@@ -561,41 +609,43 @@ class MainActivity : AppCompatActivity() {
             }
 
                         if (msg.driveFileId != null && msg.fileType != null) {
-                val decryptedFileId = decryptMessage(msg.driveFileId)
-                
-                val attachmentContainer = LinearLayout(this)
-                attachmentContainer.orientation = LinearLayout.HORIZONTAL
-                attachmentContainer.gravity = Gravity.CENTER_VERTICAL
-                attachmentContainer.setPadding(0, 8, 0, 16)
+    val decryptedFileId = decryptMessage(msg.driveFileId)
+    val fileName = msg.fileName ?: "attachment"
+    
+    val attachmentContainer = LinearLayout(this)
+    attachmentContainer.orientation = LinearLayout.HORIZONTAL
+    attachmentContainer.gravity = Gravity.CENTER_VERTICAL
+    attachmentContainer.setPadding(0, 8, 0, 16)
 
-                val downloadIcon = ImageView(this)
-                downloadIcon.setImageResource(android.R.drawable.stat_sys_download)
-                downloadIcon.setColorFilter(Color.parseColor("#075E54"))
-                val iconParams = LinearLayout.LayoutParams(64, 64)
-                iconParams.setMargins(0, 0, 16, 0)
-                downloadIcon.layoutParams = iconParams
+    val iconRes = if (msg.fileType.startsWith("image/")) 
+        android.R.drawable.ic_menu_gallery 
+    else 
+        android.R.drawable.ic_menu_save
+        
+    val downloadIcon = ImageView(this)
+    downloadIcon.setImageResource(iconRes)
+    downloadIcon.setColorFilter(Color.parseColor("#075E54"))
+    val iconParams = LinearLayout.LayoutParams(48, 48)
+    iconParams.setMargins(0, 0, 16, 0)
+    downloadIcon.layoutParams = iconParams
 
-                val attachmentText = TextView(this)
-                attachmentText.textSize = 14f
-                attachmentText.setTypeface(null, Typeface.BOLD)
-                attachmentText.setTextColor(Color.parseColor("#075E54"))
-                
-                // Fixed: Use regular if-else instead of expression
-                if (msg.fileType.startsWith("image/")) {
-                    attachmentText.text = "Image Attachment"
-                } else {
-                    attachmentText.text = "Document Attachment"
-                }
+    val attachmentText = TextView(this)
+    attachmentText.text = if (msg.fileType.startsWith("image/")) 
+        "📷 $fileName" 
+    else 
+        "📎 $fileName"
+    attachmentText.textSize = 14f
+    attachmentText.setTextColor(Color.parseColor("#075E54"))
 
-                attachmentContainer.addView(downloadIcon)
-                attachmentContainer.addView(attachmentText)
-                
-                attachmentContainer.setOnClickListener {
-                    triggerDownload(decryptedFileId, "attachment")
-                }
-                
-                bubbleLayout.addView(attachmentContainer)
-            }
+    attachmentContainer.addView(downloadIcon)
+    attachmentContainer.addView(attachmentText)
+    
+    attachmentContainer.setOnClickListener {
+        triggerDownload(decryptedFileId, fileName, msg.fileType)
+    }
+    
+    bubbleLayout.addView(attachmentContainer)
+}
 
             val decryptedText = decryptMessage(msg.message)
 
