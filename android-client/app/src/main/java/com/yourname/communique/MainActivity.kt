@@ -493,148 +493,41 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateUserCount() {
-        userCountText.text = "${chatHistory.map { it.device }.distinct().size} users"
+        ChatUIHelper.updateUserCountBar(this, userCountText, chatHistory)
     }
 
     private fun updateChatUI() {
         chatMessageContainer.removeAllViews()
-        val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
 
-        // NEW: Find the indices of the last 2 images in the chat history
+        // Identify the last 2 images for auto-download
         val imageIndices = chatHistory.indices.filter { chatHistory[it].fileType?.startsWith("image/") == true }
         val autoDownloadIndices = imageIndices.takeLast(2)
 
         for ((index, msg) in chatHistory.withIndex()) {
-            val isMe = msg.device == currentDeviceName
-            
-            val bubbleShape = GradientDrawable()
-            bubbleShape.cornerRadius = 48f
-            if (isMe) bubbleShape.setColor(Color.parseColor("#DCF8C6")) else bubbleShape.setColor(Color.parseColor("#FFFFFF"))
-
-            val bubbleLayout = LinearLayout(this)
-            bubbleLayout.orientation = LinearLayout.VERTICAL
-            bubbleLayout.background = bubbleShape
-            bubbleLayout.setPadding(40, 32, 40, 32)
-            bubbleLayout.elevation = 4f
-
-            if (!isMe) {
-                val deviceText = TextView(this)
-                deviceText.text = msg.device
-                deviceText.textSize = 12f
-                deviceText.setTextColor(Color.parseColor("#007BFF"))
-                deviceText.setTypeface(null, Typeface.BOLD)
-                deviceText.setPadding(0, 0, 0, 8)
-                bubbleLayout.addView(deviceText)
-            }
-
-            // --- OPTIMIZED MEDIA HANDLING UI ---
-            if (msg.driveFileId != null && msg.fileType != null) {
-                val decryptedFileId = decryptMessage(msg.driveFileId)
-                val fileName = msg.fileName ?: "attachment"
-                
-                // ONLY Auto-load if it's an image AND it is one of the last 2 images
-                if (msg.fileType.startsWith("image/") && index in autoDownloadIndices) {
-                    val thumbnailView = ImageView(this)
-                    val params = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        500 // Height of thumbnail in pixels
-                    )
-                    params.setMargins(0, 8, 0, 16)
-                    thumbnailView.layoutParams = params
-                    thumbnailView.scaleType = ImageView.ScaleType.CENTER_CROP
-                    thumbnailView.setBackgroundColor(Color.parseColor("#DDDDDD")) // Loading placeholder
-                    
-                    thumbnailView.setOnClickListener {
-                        triggerDownload(decryptedFileId, fileName, msg.fileType)
-                    }
-                    bubbleLayout.addView(thumbnailView)
-
-                    CoroutineScope(Dispatchers.IO).launch {
-                        mediaManager.loadThumbnail(decryptedFileId, fileName, thumbnailView)
-                    }
-                } else {
-                    // Manual Download for everything else (Older images + all documents)
-                    val attachmentContainer = LinearLayout(this)
-                    attachmentContainer.orientation = LinearLayout.HORIZONTAL
-                    attachmentContainer.gravity = Gravity.CENTER_VERTICAL
-                    attachmentContainer.setPadding(0, 8, 0, 16)
-
-                    val downloadIcon = ImageView(this)
-                    downloadIcon.setImageResource(android.R.drawable.ic_menu_save)
-                    downloadIcon.setColorFilter(Color.parseColor("#075E54"))
-                    val iconParams = LinearLayout.LayoutParams(48, 48)
-                    iconParams.setMargins(0, 0, 16, 0)
-                    downloadIcon.layoutParams = iconParams
-
-                    val attachmentText = TextView(this)
-                    // Change text slightly if it's an older image vs a document
-                    attachmentText.text = if (msg.fileType.startsWith("image/")) "🖼️ Tap to download image" else "📎 $fileName"
-                    attachmentText.textSize = 14f
-                    attachmentText.setTextColor(Color.parseColor("#075E54"))
-
-                    attachmentContainer.addView(downloadIcon)
-                    attachmentContainer.addView(attachmentText)
-                    
-                    // Clicking this triggers the background download and opens the file viewer
-                    attachmentContainer.setOnClickListener {
-                        triggerDownload(decryptedFileId, fileName, msg.fileType)
-                    }
-                    bubbleLayout.addView(attachmentContainer)
-                }
-            }
-            // -------------------------------
-
             val decryptedText = decryptMessage(msg.message)
-            val messageView = TextView(this)
-            messageView.textSize = 16f
-            messageView.setTextColor(Color.BLACK)
+            val decryptedFileId = msg.driveFileId?.let { decryptMessage(it) }
+            val isFocusedMatch = searchMatchIndices.isNotEmpty() && currentSearchIndex >= 0 && searchMatchIndices[currentSearchIndex] == index
+            val isAutoDownload = index in autoDownloadIndices
 
-            if (currentSearchQuery.isNotEmpty() && decryptedText.contains(currentSearchQuery, ignoreCase = true)) {
-                val spannable = SpannableString(decryptedText)
-                val startPos = decryptedText.indexOf(currentSearchQuery, ignoreCase = true)
-                val isFocusedMatch = searchMatchIndices.isNotEmpty() && currentSearchIndex >= 0 && searchMatchIndices[currentSearchIndex] == index
-                
-                val highlightColor = if (isFocusedMatch) Color.parseColor("#FF9800") else Color.YELLOW
-                val textColor = if (isFocusedMatch) Color.WHITE else Color.BLACK
-
-                spannable.setSpan(BackgroundColorSpan(highlightColor), startPos, startPos + currentSearchQuery.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-                spannable.setSpan(ForegroundColorSpan(textColor), startPos, startPos + currentSearchQuery.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-                messageView.text = spannable
-            } else {
-                messageView.text = decryptedText
+            // Delegate the UI building to our new helper file
+            val bubbleView = ChatUIHelper.buildMessageBubble(
+                context = this,
+                msg = msg,
+                currentDeviceName = currentDeviceName,
+                isAutoDownload = isAutoDownload,
+                decryptedText = decryptedText,
+                decryptedFileId = decryptedFileId,
+                currentSearchQuery = currentSearchQuery,
+                isFocusedSearchMatch = isFocusedMatch,
+                mediaManager = mediaManager
+            ) { fileId, fileName, fileType ->
+                triggerDownload(fileId, fileName, fileType)
             }
 
-            bubbleLayout.addView(messageView)
-
-            val timeText = TextView(this)
-            timeText.text = timeFormat.format(Date(msg.timestamp))
-            timeText.textSize = 10f
-            timeText.setTextColor(Color.GRAY)
-            timeText.setTypeface(null, Typeface.ITALIC)
-            timeText.gravity = Gravity.END
-            timeText.setPadding(0, 12, 0, 0)
-            bubbleLayout.addView(timeText)
-
-            val wrapper = LinearLayout(this)
-            val wrapperParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            wrapperParams.setMargins(0, 12, 0, 12)
-            wrapper.layoutParams = wrapperParams
-            
-            if (isMe) {
-                wrapper.gravity = Gravity.END
-                wrapper.setPadding(150, 0, 0, 0)
-            } else {
-                wrapper.gravity = Gravity.START
-                wrapper.setPadding(0, 0, 150, 0)
-            }
-            
-            wrapper.addView(bubbleLayout)
-            chatMessageContainer.addView(wrapper)
+            chatMessageContainer.addView(bubbleView)
         }
 
+        // Auto-scroll to bottom if not searching
         if (currentSearchQuery.isEmpty() && chatMessageContainer.childCount > 0) {
             chatScrollView.post { chatScrollView.smoothScrollTo(0, chatMessageContainer.bottom) }
         }
