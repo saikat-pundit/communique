@@ -212,7 +212,11 @@ class MainActivity : AppCompatActivity() {
         cipher.init(Cipher.ENCRYPT_MODE, getSecretKey())
         return cipher.doFinal(fileBytes)
     }
-    
+    private fun decryptFileBytes(encryptedBytes: ByteArray): ByteArray {
+        val cipher = Cipher.getInstance("AES/ECB/PKCS5Padding")
+        cipher.init(Cipher.DECRYPT_MODE, getSecretKey())
+        return cipher.doFinal(encryptedBytes)
+    }
     private suspend fun handleFileUpload(uri: Uri) {
         withContext(Dispatchers.IO) {
             try {
