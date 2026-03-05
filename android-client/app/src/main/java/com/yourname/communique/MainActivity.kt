@@ -500,6 +500,10 @@ class MainActivity : AppCompatActivity() {
         chatMessageContainer.removeAllViews()
         val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
 
+        // NEW: Find the indices of the last 2 images in the chat history
+        val imageIndices = chatHistory.indices.filter { chatHistory[it].fileType?.startsWith("image/") == true }
+        val autoDownloadIndices = imageIndices.takeLast(2)
+
         for ((index, msg) in chatHistory.withIndex()) {
             val isMe = msg.device == currentDeviceName
             
@@ -523,13 +527,13 @@ class MainActivity : AppCompatActivity() {
                 bubbleLayout.addView(deviceText)
             }
 
-            // --- NEW MEDIA HANDLING UI ---
+            // --- OPTIMIZED MEDIA HANDLING UI ---
             if (msg.driveFileId != null && msg.fileType != null) {
                 val decryptedFileId = decryptMessage(msg.driveFileId)
                 val fileName = msg.fileName ?: "attachment"
                 
-                if (msg.fileType.startsWith("image/")) {
-                    // It's an image, let's show a thumbnail!
+                // ONLY Auto-load if it's an image AND it is one of the last 2 images
+                if (msg.fileType.startsWith("image/") && index in autoDownloadIndices) {
                     val thumbnailView = ImageView(this)
                     val params = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
@@ -540,18 +544,16 @@ class MainActivity : AppCompatActivity() {
                     thumbnailView.scaleType = ImageView.ScaleType.CENTER_CROP
                     thumbnailView.setBackgroundColor(Color.parseColor("#DDDDDD")) // Loading placeholder
                     
-                    // Click to view full image
                     thumbnailView.setOnClickListener {
                         triggerDownload(decryptedFileId, fileName, msg.fileType)
                     }
                     bubbleLayout.addView(thumbnailView)
 
-                    // Ask MediaManager to load the image quietly in the background
                     CoroutineScope(Dispatchers.IO).launch {
                         mediaManager.loadThumbnail(decryptedFileId, fileName, thumbnailView)
                     }
                 } else {
-                    // Standard File Attachment (PDF, ZIP, etc)
+                    // Manual Download for everything else (Older images + all documents)
                     val attachmentContainer = LinearLayout(this)
                     attachmentContainer.orientation = LinearLayout.HORIZONTAL
                     attachmentContainer.gravity = Gravity.CENTER_VERTICAL
@@ -565,13 +567,15 @@ class MainActivity : AppCompatActivity() {
                     downloadIcon.layoutParams = iconParams
 
                     val attachmentText = TextView(this)
-                    attachmentText.text = "📎 $fileName"
+                    // Change text slightly if it's an older image vs a document
+                    attachmentText.text = if (msg.fileType.startsWith("image/")) "🖼️ Tap to download image" else "📎 $fileName"
                     attachmentText.textSize = 14f
                     attachmentText.setTextColor(Color.parseColor("#075E54"))
 
                     attachmentContainer.addView(downloadIcon)
                     attachmentContainer.addView(attachmentText)
                     
+                    // Clicking this triggers the background download and opens the file viewer
                     attachmentContainer.setOnClickListener {
                         triggerDownload(decryptedFileId, fileName, msg.fileType)
                     }
