@@ -17,10 +17,10 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    # Upgraded to v4: Automatically caches Gradle dependencies and build state to speed up future runs
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
-
+      with:
+        gradle-version: '8.4'
     - name: Prepare Assets & Inject Secrets
       run: |
         echo "GIST_TOKEN=\"${{ secrets.GIST_TOKEN }}\"" >> android-client/local.properties
