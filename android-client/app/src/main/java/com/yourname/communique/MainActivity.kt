@@ -1,5 +1,5 @@
 package com.yourname.communique
-
+import android.provider.MediaStore
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -227,15 +227,32 @@ class MainActivity : AppCompatActivity() {
 
                 if (mimeType.startsWith("image/")) {
                     try {
-                        val source = ImageDecoder.createSource(contentResolver, uri)
-                        val bitmap = ImageDecoder.decodeBitmap(source)
+                        // FIX: Use different decoding methods based on Android version
+                        val bitmap: Bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                            // For Android 9 and above
+                            val source = ImageDecoder.createSource(contentResolver, uri)
+                            ImageDecoder.decodeBitmap(source)
+                        } else {
+                            // For Android 8 and below (fixes the Android 7 crash!)
+                            @Suppress("DEPRECATION")
+                            MediaStore.Images.Media.getBitmap(contentResolver, uri)
+                        }
+
                         val baos = ByteArrayOutputStream()
-                        val format = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) Bitmap.CompressFormat.WEBP_LOSSY else @Suppress("DEPRECATION") Bitmap.CompressFormat.WEBP
+                        val format = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            Bitmap.CompressFormat.WEBP_LOSSY
+                        } else {
+                            @Suppress("DEPRECATION")
+                            Bitmap.CompressFormat.WEBP
+                        }
+                        
                         bitmap.compress(format, 80, baos)
                         fileBytes = baos.toByteArray()
                         finalMimeType = "image/webp"
                         finalFileName = fileName.substringBeforeLast(".") + ".webp"
-                    } catch (e: Exception) { e.printStackTrace() }
+                    } catch (e: Exception) { 
+                        e.printStackTrace() 
+                    }
                 }
 
                 withContext(Dispatchers.Main) { Toast.makeText(this@MainActivity, "Encrypting and Uploading $finalFileName...", Toast.LENGTH_SHORT).show() }
