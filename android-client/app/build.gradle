@@ -26,6 +26,7 @@ android {
         buildConfigField "String", "CHAT_GIST_ID", localProperties.getProperty("CHAT_GIST_ID", "\"\"")
         buildConfigField "String", "GAS_UPLOAD_URL", localProperties.getProperty("GAS_UPLOAD_URL", "\"\"")
         buildConfigField "String", "ENCRYPTION_KEY", localProperties.getProperty("ENCRYPTION_KEY", "\"\"")
+        buildConfigField "String", "ARCHIVE_GIST_ID", properties.getProperty("ARCHIVE_GIST_ID", "\"\"")
     }
 
     buildFeatures {
