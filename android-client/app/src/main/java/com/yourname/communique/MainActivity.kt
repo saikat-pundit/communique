@@ -496,20 +496,18 @@ class MainActivity : AppCompatActivity() {
                     messageInput.hint = "Replying to $quotedDevice (Tap to cancel)..."
                     
                     // Allow tapping the empty text box to cancel the reply
-                    messageInput.setOnClickListener {
-                        if (messageInput.text.isEmpty() && replyingToDevice != null) {
-                            replyingToDevice = null
-                            replyingToText = null
-                            messageInput.hint = "Type a message..."
-                            Toast.makeText(this@MainActivity, "Reply cancelled", Toast.LENGTH_SHORT).show()
-                        }
+                messageInput.setOnClickListener {
+                    if (messageInput.text.isEmpty() && replyingToDevice != null) {
+                        replyingToDevice = null
+                        replyingToText = null
+                        messageInput.hint = "Type a message..."
+                        Toast.makeText(this@MainActivity, "Reply cancelled", Toast.LENGTH_SHORT).show()
                     }
                 }
-            ) { fileId, fileName, fileType ->
-                triggerDownload(fileId, fileName, fileType)
             }
+        ) // <--- Just close the parenthesis here!
 
-            chatMessageContainer.addView(bubbleView)
+        chatMessageContainer.addView(bubbleView)
         }
 
         // Auto-scroll to bottom if not searching
