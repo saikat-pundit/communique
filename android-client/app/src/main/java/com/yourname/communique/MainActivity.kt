@@ -277,12 +277,16 @@ class MainActivity : AppCompatActivity() {
                         val jsonResponse = JSONObject(responseString)
                         if (jsonResponse.optString("status") == "success") {
                             val fileId = jsonResponse.getString("fileId")
-                            val text = messageInput.text.toString().ifEmpty { "Sent an encrypted file" }
+                            
+                            // Safely switch to the Main thread to read and clear the UI text
                             withContext(Dispatchers.Main) {
+                                val text = messageInput.text.toString().trim().ifEmpty { "Sent an encrypted file" }
                                 messageInput.text.clear()
                                 Toast.makeText(this@MainActivity, "Upload complete!", Toast.LENGTH_SHORT).show()
+                                
+                                // Send the message while still on the Main thread
+                                sendMessage(text, fileId, finalMimeType, finalFileName)
                             }
-                            sendMessage(text, fileId, finalMimeType, finalFileName)
                         } else {
                             withContext(Dispatchers.Main) { Toast.makeText(this@MainActivity, "GAS Error: ${jsonResponse.optString("message")}", Toast.LENGTH_LONG).show() }
                         }
