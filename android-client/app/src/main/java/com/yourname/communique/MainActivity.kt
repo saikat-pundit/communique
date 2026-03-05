@@ -137,7 +137,6 @@ class MainActivity : AppCompatActivity() {
                     chatLayout.animate().alpha(1f).setDuration(600).start()
                     isPolling = true
                     startPollingGist()
-                    CoroutineScope(Dispatchers.IO).launch { fetchDriveAccessToken() }
                 }.start()
             } else {
                 Toast.makeText(this, "Incorrect App Lock PIN", Toast.LENGTH_SHORT).show()
@@ -213,72 +212,7 @@ class MainActivity : AppCompatActivity() {
         cipher.init(Cipher.ENCRYPT_MODE, getSecretKey())
         return cipher.doFinal(fileBytes)
     }
-    private suspend fun fetchDriveAccessToken() {
-        try {
-            val b64Json = BuildConfig.DRIVE_JSON_B64
-            if (b64Json.isEmpty()) return
-            
-            val jsonString = String(Base64.decode(b64Json, Base64.DEFAULT), Charsets.UTF_8)
-            val serviceAccount = JSONObject(jsonString)
-            
-            val clientEmail = serviceAccount.getString("client_email")
-            val privateKeyString = serviceAccount.getString("private_key")
-                .replace("-----BEGIN PRIVATE KEY-----\n", "")
-                .replace("-----END PRIVATE KEY-----\n", "")
-                .replace("\n", "")
-
-            val header = JSONObject().apply {
-                put("alg", "RS256")
-                put("typ", "JWT")
-            }.toString().let { Base64.encodeToString(it.toByteArray(), Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP) }
-
-            val now = System.currentTimeMillis() / 1000
-            val claimSet = JSONObject().apply {
-                put("iss", clientEmail)
-                put("scope", "https://www.googleapis.com/auth/drive.file")
-                put("aud", "https://oauth2.googleapis.com/token")
-                put("exp", now + 3600)
-                put("iat", now)
-            }.toString().let { Base64.encodeToString(it.toByteArray(), Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP) }
-
-            val unsignedJwt = "$header.$claimSet"
-
-            val keyBytes = Base64.decode(privateKeyString, Base64.DEFAULT)
-            val keySpec = PKCS8EncodedKeySpec(keyBytes)
-            val kf = KeyFactory.getInstance("RSA")
-            val privateKey = kf.generatePrivate(keySpec)
-
-            val signature = Signature.getInstance("SHA256withRSA")
-            signature.initSign(privateKey)
-            signature.update(unsignedJwt.toByteArray(Charsets.UTF_8))
-            val signedBytes = signature.sign()
-            
-            val signatureBase64 = Base64.encodeToString(signedBytes, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
-            val jwt = "$unsignedJwt.$signatureBase64"
-
-            val formBody = FormBody.Builder()
-                .add("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer")
-                .add("assertion", jwt)
-                .build()
-
-            val request = Request.Builder()
-                .url("https://oauth2.googleapis.com/token")
-                .post(formBody)
-                .build()
-
-            httpClient.newCall(request).execute().use { response ->
-                if (response.isSuccessful) {
-                    val respString = response.body?.string()
-                    if (respString != null) {
-                        googleDriveAccessToken = JSONObject(respString).getString("access_token")
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
+    
     private suspend fun handleFileUpload(uri: Uri) {
         withContext(Dispatchers.IO) {
             try {
