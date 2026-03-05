@@ -27,7 +27,7 @@ jobs:
         # Inject Secrets
         echo "GIST_TOKEN=\"${{ secrets.GIST_TOKEN }}\"" >> android-client/local.properties
         echo "CHAT_GIST_ID=\"${{ secrets.CHAT_GIST_ID }}\"" >> android-client/local.properties
-        echo "DRIVE_JSON_B64=\"${{ secrets.DRIVE_JSON_B64 }}\"" >> android-client/local.properties
+        echo "GAS_UPLOAD_URL=\"${{ secrets.GAS_UPLOAD_URL }}\"" >> android-client/local.properties
         echo "ENCRYPTION_KEY=\"${{ secrets.ENCRYPTION_KEY }}\"" >> android-client/local.properties
         
         # Move user images into the Android drawable folder safely
