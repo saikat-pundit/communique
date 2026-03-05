@@ -48,7 +48,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
-
+import java.io.File
 data class ChatMessage(val device: String, val message: String, val timestamp: Long, val driveFileId: String? = null, val fileType: String? = null, val fileName: String? = null)
 
 class MainActivity : AppCompatActivity() {
@@ -347,10 +347,9 @@ class MainActivity : AppCompatActivity() {
                     val decryptedBytes = decryptFileBytes(encryptedBytes)
 
                     // 3. Save the decrypted bytes to a local cache file so we can open it
-                    val cacheDir = File(cacheDir, "decrypted_media")
-                    if (!cacheDir.exists()) cacheDir.mkdirs()
-                    
-                    val file = File(cacheDir, fileName)
+                    val mediaDir = File(cacheDir, "decrypted_media")
+                    if (!mediaDir.exists()) mediaDir.mkdirs()
+                    val file = File(mediaDir, fileName)
                     file.writeBytes(decryptedBytes)
 
                     // 4. Use FileProvider to safely share the file with other apps to view it
