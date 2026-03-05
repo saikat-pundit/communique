@@ -45,8 +45,16 @@ import java.util.*
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 
-data class ChatMessage(val device: String, val message: String, val timestamp: Long, val driveFileId: String? = null, val fileType: String? = null, val fileName: String? = null)
-
+data class ChatMessage(
+    val device: String, 
+    val message: String, 
+    val timestamp: Long, 
+    val driveFileId: String? = null, 
+    val fileType: String? = null, 
+    val fileName: String? = null,
+    val replyToDevice: String? = null, // NEW: Who are we quoting?
+    val replyToText: String? = null    // NEW: What did they say?
+)
 class MainActivity : AppCompatActivity() {
 
     private val httpClient = OkHttpClient()
@@ -60,7 +68,8 @@ class MainActivity : AppCompatActivity() {
     private var currentSearchQuery = ""
     private var searchMatchIndices = mutableListOf<Int>()
     private var currentSearchIndex = -1
-    
+    private var replyingToDevice: String? = null
+    private var replyingToText: String? = null
     private lateinit var chatMessageContainer: LinearLayout
     private lateinit var chatScrollView: ScrollView
     private lateinit var userCountText: TextView
@@ -198,8 +207,18 @@ class MainActivity : AppCompatActivity() {
         val encryptedText = CryptoHelper.encrypt(rawText)
         val encryptedFileId = driveFileId?.let { CryptoHelper.encrypt(it) }
         
-        val newMessage = ChatMessage(currentDeviceName, encryptedText, System.currentTimeMillis(), encryptedFileId, fileType, fileName)
+        // Encrypt the quoted text so it stays secure!
+        val encryptedReplyDevice = replyingToDevice?.let { CryptoHelper.encrypt(it) }
+        val encryptedReplyText = replyingToText?.let { CryptoHelper.encrypt(it) }
+        
+        val newMessage = ChatMessage(currentDeviceName, encryptedText, System.currentTimeMillis(), encryptedFileId, fileType, fileName, encryptedReplyDevice, encryptedReplyText)
         chatHistory.add(newMessage)
+        
+        // Reset the reply state and UI
+        replyingToDevice = null
+        replyingToText = null
+        messageInput.hint = "Type a message..."
+        
         CoroutineScope(Dispatchers.Main).launch { updateChatUI() }
         CoroutineScope(Dispatchers.IO).launch { networkHelper.pushGistUpdate(chatHistory) }
     }
