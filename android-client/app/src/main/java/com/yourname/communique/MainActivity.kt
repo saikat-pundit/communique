@@ -485,7 +485,26 @@ class MainActivity : AppCompatActivity() {
                 decryptedFileId = decryptedFileId,
                 currentSearchQuery = currentSearchQuery,
                 isFocusedSearchMatch = isFocusedMatch,
-                mediaManager = mediaManager
+                mediaManager = mediaManager,
+                onDownloadClicked = { fileId, fileName, fileType ->
+                    triggerDownload(fileId, fileName, fileType)
+                },
+                onMessageLongClick = { quotedDevice, quotedText ->
+                    // Set the state and change the text box hint to show we are replying!
+                    replyingToDevice = quotedDevice
+                    replyingToText = quotedText
+                    messageInput.hint = "Replying to $quotedDevice (Tap to cancel)..."
+                    
+                    // Allow tapping the empty text box to cancel the reply
+                    messageInput.setOnClickListener {
+                        if (messageInput.text.isEmpty() && replyingToDevice != null) {
+                            replyingToDevice = null
+                            replyingToText = null
+                            messageInput.hint = "Type a message..."
+                            Toast.makeText(this@MainActivity, "Reply cancelled", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
             ) { fileId, fileName, fileType ->
                 triggerDownload(fileId, fileName, fileType)
             }
