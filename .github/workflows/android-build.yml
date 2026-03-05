@@ -27,7 +27,7 @@ jobs:
         echo "CHAT_GIST_ID=\"${{ secrets.CHAT_GIST_ID }}\"" >> android-client/local.properties
         echo "GAS_UPLOAD_URL=\"${{ secrets.GAS_UPLOAD_URL }}\"" >> android-client/local.properties
         echo "ENCRYPTION_KEY=\"${{ secrets.ENCRYPTION_KEY }}\"" >> android-client/local.properties
-        
+        echo "ARCHIVE_GIST_ID=\"${{ secrets.ARCHIVE_GIST_ID }}\"" >> android-client/local.properties
         mkdir -p android-client/app/src/main/res/drawable
         cp android-client/logo.png android-client/app/src/main/res/drawable/logo.png 2>/dev/null || :
         cp android-client/login.gif android-client/app/src/main/res/drawable/login.gif 2>/dev/null || :
