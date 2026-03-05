@@ -51,6 +51,7 @@ class MainActivity : AppCompatActivity() {
 
     private val httpClient = OkHttpClient()
     private val gson = Gson()
+    private val networkHelper = NetworkHelper(httpClient, gson)
     private var currentDeviceName = ""
     private var chatHistory = mutableListOf<ChatMessage>()
     private var isPolling = false
@@ -373,29 +374,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // Keep Text Encryption here in MainActivity
-    private fun getSecretKey(): SecretKeySpec {
-        val digest = MessageDigest.getInstance("SHA-256")
-        val keyBytes = digest.digest(BuildConfig.ENCRYPTION_KEY.toByteArray(Charsets.UTF_8))
-        return SecretKeySpec(keyBytes, "AES")
-    }
-
-    private fun encryptMessage(message: String): String {
-        val cipher = Cipher.getInstance("AES/ECB/PKCS5Padding")
-        cipher.init(Cipher.ENCRYPT_MODE, getSecretKey())
-        return Base64.encodeToString(cipher.doFinal(message.toByteArray(Charsets.UTF_8)), Base64.DEFAULT)
-    }
-
-    private fun decryptMessage(encryptedMessage: String): String {
-        return try {
-            val cipher = Cipher.getInstance("AES/ECB/PKCS5Padding")
-            cipher.init(Cipher.DECRYPT_MODE, getSecretKey())
-            String(cipher.doFinal(Base64.decode(encryptedMessage, Base64.DEFAULT)), Charsets.UTF_8)
-        } catch (e: Exception) {
-            "🔒 [Decryption Failed]"
-        }
-    }
-
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(CHANNEL_ID, "Communique Chat", NotificationManager.IMPORTANCE_HIGH)
@@ -431,65 +409,9 @@ class MainActivity : AppCompatActivity() {
         CoroutineScope(Dispatchers.IO).launch {
             while (isPolling) {
                 fetchGist()
-                delay(5000)
+                delay(2000)
             }
         }
-    }
-
-    private fun fetchGist() {
-        val request = Request.Builder()
-            .url("https://api.github.com/gists/${BuildConfig.CHAT_GIST_ID}")
-            .addHeader("Authorization", "Bearer ${BuildConfig.GIST_TOKEN}")
-            .build()
-
-        try {
-            httpClient.newCall(request).execute().use { response ->
-                if (response.isSuccessful) {
-                    val responseData = response.body?.string() ?: return
-                    val content = JSONObject(responseData).getJSONObject("files").getJSONObject("chat_ledger.json").getString("content")
-                    val fetchedHistory: List<ChatMessage> = gson.fromJson(content, object : TypeToken<List<ChatMessage>>() {}.type) ?: emptyList()
-
-                    if (fetchedHistory.size > chatHistory.size) {
-                        val lastMessage = fetchedHistory.last()
-                        val isMe = lastMessage.device == currentDeviceName
-
-                        chatHistory.clear()
-                        chatHistory.addAll(fetchedHistory)
-
-                        CoroutineScope(Dispatchers.Main).launch {
-                            updateChatUI()
-                            updateUserCount()
-                            if (!isFirstLoad && !isMe) {
-                                playNotificationSound()
-                                showNotification(lastMessage.device, decryptMessage(lastMessage.message))
-                            }
-                            isFirstLoad = false
-                        }
-                    } else if (isFirstLoad) {
-                        isFirstLoad = false
-                        CoroutineScope(Dispatchers.Main).launch { updateUserCount() }
-                    }
-                }
-            }
-        } catch (e: Exception) {}
-    }
-
-    private fun pushGistUpdate(history: List<ChatMessage>) {
-        val payload = JSONObject().apply {
-            put("files", JSONObject().apply {
-                put("chat_ledger.json", JSONObject().apply {
-                    put("content", gson.toJson(history))
-                })
-            })
-        }
-        val request = Request.Builder()
-            .url("https://api.github.com/gists/${BuildConfig.CHAT_GIST_ID}")
-            .addHeader("Authorization", "Bearer ${BuildConfig.GIST_TOKEN}")
-            .patch(payload.toString().toRequestBody("application/json".toMediaType()))
-            .build()
-        try {
-            httpClient.newCall(request).execute().close()
-        } catch (e: Exception) {}
     }
 
     private fun updateUserCount() {
