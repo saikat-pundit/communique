@@ -408,8 +408,29 @@ class MainActivity : AppCompatActivity() {
     private fun startPollingGist() {
         CoroutineScope(Dispatchers.IO).launch {
             while (isPolling) {
-                fetchGist()
-                delay(2000)
+                val fetchedHistory = networkHelper.fetchChatHistory()
+                
+                if (fetchedHistory != null && fetchedHistory.size > chatHistory.size) {
+                    val lastMessage = fetchedHistory.last()
+                    val isMe = lastMessage.device == currentDeviceName
+
+                    chatHistory.clear()
+                    chatHistory.addAll(fetchedHistory)
+
+                    CoroutineScope(Dispatchers.Main).launch {
+                        updateChatUI()
+                        updateUserCount()
+                        if (!isFirstLoad && !isMe) {
+                            playNotificationSound()
+                            showNotification(lastMessage.device, CryptoHelper.decrypt(lastMessage.message))
+                        }
+                        isFirstLoad = false
+                    }
+                } else if (isFirstLoad && fetchedHistory != null) {
+                    isFirstLoad = false
+                    CoroutineScope(Dispatchers.Main).launch { updateUserCount() }
+                }
+                delay(3000)
             }
         }
     }
