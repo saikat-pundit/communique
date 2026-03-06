@@ -85,6 +85,21 @@ object ChatUIHelper {
         if (decryptedFileId != null && msg.fileType != null) {
             val fileName = msg.fileName ?: "attachment"
             
+            // --- NEW: Helper function to apply highlighting to file names ---
+            fun getHighlightedFileName(baseText: String): CharSequence {
+                if (currentSearchQuery.isNotEmpty() && baseText.contains(currentSearchQuery, ignoreCase = true)) {
+                    val spannable = SpannableString(baseText)
+                    val startPos = baseText.indexOf(currentSearchQuery, ignoreCase = true)
+                    val highlightColor = if (isFocusedSearchMatch) Color.parseColor("#FF9800") else Color.YELLOW
+                    val textColor = if (isFocusedSearchMatch) Color.WHITE else Color.BLACK
+                    spannable.setSpan(BackgroundColorSpan(highlightColor), startPos, startPos + currentSearchQuery.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    spannable.setSpan(ForegroundColorSpan(textColor), startPos, startPos + currentSearchQuery.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    return spannable
+                }
+                return baseText
+            }
+            // ---------------------------------------------------------------
+
             if (msg.fileType.startsWith("image/") && isAutoDownload) {
                 val thumbnailView = ImageView(context)
                 val params = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 400) 
@@ -95,6 +110,14 @@ object ChatUIHelper {
                 
                 thumbnailView.setOnClickListener { onDownloadClicked(decryptedFileId, fileName, msg.fileType) }
                 bubbleLayout.addView(thumbnailView)
+
+                // NEW: Show the image filename under the thumbnail so it can be searched and highlighted!
+                val imageFileNameText = TextView(context)
+                imageFileNameText.text = getHighlightedFileName("🖼️ $fileName")
+                imageFileNameText.textSize = 11f
+                imageFileNameText.setTextColor(Color.GRAY)
+                imageFileNameText.setPadding(0, 0, 0, 8)
+                bubbleLayout.addView(imageFileNameText)
 
                 CoroutineScope(Dispatchers.IO).launch {
                     mediaManager.loadThumbnail(decryptedFileId, fileName, thumbnailView)
@@ -113,7 +136,10 @@ object ChatUIHelper {
                 downloadIcon.layoutParams = iconParams
 
                 val attachmentText = TextView(context)
-                attachmentText.text = if (msg.fileType.startsWith("image/")) "🖼️ Tap to view image" else "📎 $fileName"
+                
+                // UPDATED: Include the filename for images too, and apply highlight
+                val baseText = if (msg.fileType.startsWith("image/")) "🖼️ Image: $fileName" else "📎 $fileName"
+                attachmentText.text = getHighlightedFileName(baseText)
                 attachmentText.textSize = 13f
                 attachmentText.setTextColor(Color.parseColor("#075E54"))
 
