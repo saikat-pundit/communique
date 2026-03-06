@@ -372,7 +372,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         for ((index, msg) in chatHistory.withIndex()) {
-            if (CryptoHelper.decrypt(msg.message).contains(currentSearchQuery, ignoreCase = true)) {
+            val textMatch = CryptoHelper.decrypt(msg.message).contains(currentSearchQuery, ignoreCase = true)
+            val fileMatch = msg.fileName?.contains(currentSearchQuery, ignoreCase = true) == true
+            
+            if (textMatch || fileMatch) {
                 searchMatchIndices.add(index)
             }
         }
