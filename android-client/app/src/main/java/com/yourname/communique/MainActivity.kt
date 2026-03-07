@@ -314,9 +314,9 @@ class MainActivity : AppCompatActivity() {
                             withContext(Dispatchers.Main) {
                                 val text = messageInput.text.toString().trim().ifEmpty { "Sent an encrypted file" }
                                 messageInput.text.clear()
+                                messageInput.hint = "Type a message..." // <--- ADD THIS LINE TO RESET THE HINT
                                 Toast.makeText(this@MainActivity, "Upload complete!", Toast.LENGTH_SHORT).show()
                                 
-                                // Send the message while still on the Main thread
                                 sendMessage(text, fileId, finalMimeType, finalFileName)
                             }
                         } else {
