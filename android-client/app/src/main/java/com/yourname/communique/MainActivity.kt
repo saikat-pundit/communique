@@ -87,6 +87,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var groupOverlay: FrameLayout
     private lateinit var mediaManager: MediaManager
     private lateinit var chatLayout: RelativeLayout
+    private lateinit var sharedPrefs: android.content.SharedPreferences
     private val filePickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri?.let {
             Toast.makeText(this, "Preparing file for upload...", Toast.LENGTH_SHORT).show()
@@ -99,7 +100,18 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
+        sharedPrefs = getSharedPreferences("CommuniqueCache", Context.MODE_PRIVATE)
+        
+        // INSTANT LOAD: Read from cache before the network even starts!
+        val cachedJson = sharedPrefs.getString("chat_ledger_cache", null)
+        if (cachedJson != null) {
+            try {
+                val type = object : TypeToken<List<ChatMessage>>() {}.type
+                val cachedList: List<ChatMessage> = gson.fromJson(cachedJson, type)
+                chatHistory.clear()
+                chatHistory.addAll(cachedList)
+            } catch (e: Exception) { e.printStackTrace() }
+        }
         // Initialize MediaManager
         mediaManager = MediaManager(this, httpClient)
 
@@ -248,13 +260,37 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+    private fun saveCacheAndReadState() {
+        // Save the whole chat history to phone memory
+        sharedPrefs.edit().putString("chat_ledger_cache", gson.toJson(chatHistory)).apply()
+        // If we are currently in a group, update its read count so we don't show badges for messages we just saw/sent
+        currentGroupName?.let { markGroupAsRead(it) }
+    }
+
+    private fun markGroupAsRead(group: String) {
+        val count = chatHistory.count { (it.groupName ?: "Personal Chat") == group }
+        sharedPrefs.edit().putInt("read_count_$group", count).apply()
+    }
+
+    private fun getUnreadCounts(): Map<String, Int> {
+        val counts = mutableMapOf<String, Int>()
+        val grouped = chatHistory.groupBy { it.groupName ?: "Personal Chat" }
+        for ((group, messages) in grouped) {
+            val lastRead = sharedPrefs.getInt("read_count_$group", 0) // 0 means first time ever!
+            val unread = messages.size - lastRead
+            if (unread > 0) counts[group] = unread
+        }
+        return counts
+    }
     private fun showGroupScreen() {
         groupOverlay.removeAllViews()
         val screen = GroupUIHelper.buildGroupScreen(
             context = this,
             chatHistory = chatHistory,
+            unreadCounts = getUnreadCounts(), // Inject the math!
             onGroupSelected = { groupName ->
                 currentGroupName = groupName
+                markGroupAsRead(groupName) // They clicked it, so reset the badge!
                 groupOverlay.visibility = View.GONE
                 chatLayout.visibility = View.VISIBLE
                 updateChatUI()
@@ -262,9 +298,9 @@ class MainActivity : AppCompatActivity() {
             },
             onGroupCreated = { newGroupName ->
                 currentGroupName = newGroupName
+                markGroupAsRead(newGroupName)
                 groupOverlay.visibility = View.GONE
                 chatLayout.visibility = View.VISIBLE
-                // Instantly register the group in the Gist by sending a system message
                 sendMessage("Created group: $newGroupName", null, null, null) 
             }
         )
@@ -519,7 +555,7 @@ class MainActivity : AppCompatActivity() {
 
                     chatHistory.clear()
                     chatHistory.addAll(fetchedHistory)
-
+                    saveCacheAndReadState()
                     CoroutineScope(Dispatchers.Main).launch {
                         if (currentGroupName == null) {
                             showGroupScreen() // FIX 1: Refresh the Group screen when old groups finish loading!
