@@ -333,7 +333,8 @@ class MainActivity : AppCompatActivity() {
                 AlertDialog.Builder(this)
                     .setTitle("Delete Group?")
                     .setMessage("Do you want to delete '$groupToDelete' and ALL its messages permanently?")
-                    .setPositiveButton("Yes") { dialog, _ ->  // <--- FIXED: Explicitly named 'dialog'
+                    // 1st Warning Fix: Explicitly typed underscores
+                    .setPositiveButton("Yes") { _: DialogInterface, _: Int ->  
                         
                         // Security PIN Prompt
                         val pinInput = EditText(this).apply { 
@@ -345,7 +346,8 @@ class MainActivity : AppCompatActivity() {
                         AlertDialog.Builder(this)
                             .setTitle("Authentication Required")
                             .setView(pinInput)
-                            .setPositiveButton("Confirm") { innerDialog, _ -> // <--- FIXED: Explicitly named 'innerDialog'
+                            // 2nd Warning Fix: Explicitly typed underscores
+                            .setPositiveButton("Confirm") { _: DialogInterface, _: Int -> 
                                 if (pinInput.text.toString() == "3142") {
                                     // PIN correct: Wipe the group from the array
                                     chatHistory.removeAll { (it.groupName ?: "Personal Chat") == groupToDelete }
