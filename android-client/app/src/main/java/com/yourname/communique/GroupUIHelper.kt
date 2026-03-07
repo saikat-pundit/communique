@@ -15,6 +15,7 @@ object GroupUIHelper {
     fun buildGroupScreen(
         context: Context,
         chatHistory: List<ChatMessage>,
+        unreadCounts: Map<String, Int>, // <--- ADD THIS LINE
         onGroupSelected: (String) -> Unit,
         onGroupCreated: (String) -> Unit
     ): LinearLayout {
@@ -119,6 +120,7 @@ object GroupUIHelper {
                     }
                     setOnClickListener { onGroupSelected(group) }
                 }
+                
                 listLayout.addView(groupBtn)
             }
         }
