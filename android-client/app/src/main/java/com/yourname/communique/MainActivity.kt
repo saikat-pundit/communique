@@ -85,7 +85,7 @@ class MainActivity : AppCompatActivity() {
     private var currentGroupName: String? = null
     private lateinit var groupOverlay: FrameLayout
     private lateinit var mediaManager: MediaManager
-
+    private lateinit var chatLayout: RelativeLayout
     private val filePickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri?.let {
             Toast.makeText(this, "Preparing file for upload...", Toast.LENGTH_SHORT).show()
@@ -113,7 +113,7 @@ class MainActivity : AppCompatActivity() {
         currentDeviceName = "$manufacturer ${Build.MODEL}"
 
         val loginLayout = findViewById<LinearLayout>(R.id.loginLayout)
-        val chatLayout = findViewById<RelativeLayout>(R.id.chatLayout)
+        chatLayout = findViewById(R.id.chatLayout)
         val loginTriggerButton = findViewById<Button>(R.id.loginTriggerButton)
         val pinContainer = findViewById<LinearLayout>(R.id.pinContainer)
         val pinInput = findViewById<EditText>(R.id.pinInput)
