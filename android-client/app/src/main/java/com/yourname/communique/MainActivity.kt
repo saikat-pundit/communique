@@ -49,6 +49,7 @@ import okio.BufferedSink
 import okio.ForwardingSink
 import okio.Okio
 import okio.Sink
+import okio.buffer
 data class ChatMessage(
     val device: String, 
     val message: String, 
@@ -544,7 +545,9 @@ class ProgressRequestBody(
 
     override fun writeTo(sink: BufferedSink) {
         var lastProgress = -1
-        val countingSink = object : ForwardingSink(sink) {
+        
+        // FIXED: Force the Kotlin compiler to recognize this as a 'Sink'
+        val countingSink: Sink = object : ForwardingSink(sink) {
             var bytesWritten = 0L
             var contentLength = 0L
 
@@ -556,13 +559,15 @@ class ProgressRequestBody(
                 bytesWritten += byteCount
                 val progress = ((bytesWritten.toFloat() / contentLength.toFloat()) * 100).toInt()
                 
-                // Only update UI if the percentage actually changed to prevent spamming the Main Thread
+                // Only update UI if the percentage actually changed
                 if (progress != lastProgress) {
                     lastProgress = progress
                     onProgressUpdate(progress)
                 }
             }
         }
+        
+        // This will now compile perfectly!
         val bufferedSink = countingSink.buffer()
         requestBody.writeTo(bufferedSink)
         bufferedSink.flush()
