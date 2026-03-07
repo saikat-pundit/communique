@@ -288,10 +288,10 @@ class MainActivity : AppCompatActivity() {
         val screen = GroupUIHelper.buildGroupScreen(
             context = this,
             chatHistory = chatHistory,
-            unreadCounts = getUnreadCounts(), // Inject the math!
+            unreadCounts = getUnreadCounts(),
             onGroupSelected = { groupName ->
                 currentGroupName = groupName
-                markGroupAsRead(groupName) // They clicked it, so reset the badge!
+                markGroupAsRead(groupName) 
                 groupOverlay.visibility = View.GONE
                 chatLayout.visibility = View.VISIBLE
                 updateChatUI()
@@ -303,6 +303,64 @@ class MainActivity : AppCompatActivity() {
                 groupOverlay.visibility = View.GONE
                 chatLayout.visibility = View.VISIBLE
                 sendMessage("Created group: $newGroupName", null, null, null) 
+            },
+            // --- NEW: RENAME LOGIC ---
+            onGroupRename = { oldName, newName ->
+                // Map over the existing history and replace the old name with the new one
+                val updatedHistory = chatHistory.map {
+                    if ((it.groupName ?: "Personal Chat") == oldName) {
+                        it.copy(groupName = newName) // Changes the name but keeps the old message data intact!
+                    } else {
+                        it
+                    }
+                }
+                chatHistory.clear()
+                chatHistory.addAll(updatedHistory)
+                
+                // Migrate the unread counts in memory
+                val oldReadCount = sharedPrefs.getInt("read_count_$oldName", 0)
+                sharedPrefs.edit().putInt("read_count_$newName", oldReadCount).remove("read_count_$oldName").apply()
+                    
+                saveCacheAndReadState()
+                CoroutineScope(Dispatchers.IO).launch { networkHelper.pushGistUpdate(chatHistory) }
+                showGroupScreen() // Refresh the UI
+            },
+            // --- NEW: DELETE LOGIC ---
+            onGroupDelete = { groupToDelete ->
+                AlertDialog.Builder(this)
+                    .setTitle("Delete Group?")
+                    .setMessage("Do you want to delete '$groupToDelete' and ALL its messages permanently?")
+                    .setPositiveButton("Yes") { _, _ ->
+                        
+                        // Security PIN Prompt
+                        val pinInput = EditText(this).apply { 
+                            hint = "Enter App PIN"
+                            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
+                            gravity = Gravity.CENTER
+                        }
+                        
+                        AlertDialog.Builder(this)
+                            .setTitle("Authentication Required")
+                            .setView(pinInput)
+                            .setPositiveButton("Confirm") { _, _ ->
+                                if (pinInput.text.toString() == "3142") {
+                                    // PIN correct: Wipe the group from the array
+                                    chatHistory.removeAll { (it.groupName ?: "Personal Chat") == groupToDelete }
+                                    sharedPrefs.edit().remove("read_count_$groupToDelete").apply()
+                                    
+                                    saveCacheAndReadState()
+                                    CoroutineScope(Dispatchers.IO).launch { networkHelper.pushGistUpdate(chatHistory) }
+                                    showGroupScreen()
+                                    Toast.makeText(this, "Group deleted.", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(this, "Incorrect PIN.", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                            .setNegativeButton("Cancel", null)
+                            .show()
+                    }
+                    .setNegativeButton("No", null)
+                    .show()
             }
         )
         groupOverlay.addView(screen)
