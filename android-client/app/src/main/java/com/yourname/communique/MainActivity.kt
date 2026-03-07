@@ -50,6 +50,7 @@ import okio.ForwardingSink
 import okio.Okio
 import okio.Sink
 import okio.buffer
+import android.view.inputmethod.InputMethodManager
 data class ChatMessage(
     val device: String, 
     val message: String, 
@@ -172,8 +173,12 @@ class MainActivity : AppCompatActivity() {
 
         unlockButton.setOnClickListener {
             if (pinInput.text.toString() == "3142") {
+                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                imm.hideSoftInputFromWindow(pinInput.windowToken, 0)
+
                 loginLayout.animate().alpha(0f).setDuration(500).withEndAction {
                     loginLayout.visibility = View.GONE
+                    chatLayout.alpha = 1f // FIX 2 & 3: Make chat fully opaque so it's not a white screen!
                     isPolling = true
                     startPollingGist()
                     showGroupScreen()
@@ -502,8 +507,13 @@ class MainActivity : AppCompatActivity() {
                     chatHistory.addAll(fetchedHistory)
 
                     CoroutineScope(Dispatchers.Main).launch {
-                        updateChatUI()
-                        updateUserCount()
+                        if (currentGroupName == null) {
+                            showGroupScreen() // FIX 1: Refresh the Group screen when old groups finish loading!
+                        } else {
+                            updateChatUI()
+                            updateUserCount()
+                        }
+                        
                         if (!isFirstLoad && !isMe) {
                             playNotificationSound()
                             showNotification(lastMessage.device, CryptoHelper.decrypt(lastMessage.message))
@@ -512,7 +522,12 @@ class MainActivity : AppCompatActivity() {
                     }
                 } else if (isFirstLoad && fetchedHistory != null) {
                     isFirstLoad = false
-                    CoroutineScope(Dispatchers.Main).launch { updateUserCount() }
+                    chatHistory.clear()
+                    chatHistory.addAll(fetchedHistory)
+                    CoroutineScope(Dispatchers.Main).launch {
+                        // FIX 1: Ensure initial load populates the screen properly
+                        if (currentGroupName == null) showGroupScreen() else { updateChatUI(); updateUserCount() }
+                    }
                 }
                 delay(5000)
             }
@@ -520,8 +535,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateUserCount() {
-        val groupHistory = chatHistory.filter { (it.groupName ?: "Personal Chat") == (currentGroupName ?: "Personal Chat") }
-        ChatUIHelper.updateUserCountBar(this, userCountText, groupHistory, currentDeviceName)
+        val group = currentGroupName ?: "Personal Chat"
+        val groupHistory = chatHistory.filter { (it.groupName ?: "Personal Chat") == group }
+        ChatUIHelper.updateUserCountBar(this, userCountText, groupHistory, currentDeviceName, group)
     }
 
     private fun updateChatUI() {
