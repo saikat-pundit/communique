@@ -371,6 +371,7 @@ class MainActivity : AppCompatActivity() {
         groupOverlay.addView(screen)
         groupOverlay.visibility = View.VISIBLE
     }
+
     private fun sendMessage(rawText: String, driveFileId: String? = null, fileType: String? = null, fileName: String? = null) {
         val encryptedText = CryptoHelper.encrypt(rawText)
         val encryptedFileId = driveFileId?.let { CryptoHelper.encrypt(it) }
@@ -380,15 +381,26 @@ class MainActivity : AppCompatActivity() {
         val encryptedReplyText = replyingToText?.let { CryptoHelper.encrypt(it) }
         
         val newMessage = ChatMessage(currentDeviceName, encryptedText, System.currentTimeMillis(), encryptedFileId, fileType, fileName, encryptedReplyDevice, encryptedReplyText, currentGroupName ?: "Personal Chat")
-        chatHistory.add(newMessage)
         
-        // Reset the reply state and UI
+        // Reset the reply state and UI instantly for the user
         replyingToDevice = null
         replyingToText = null
         messageInput.hint = "Type a message..."
         
-        CoroutineScope(Dispatchers.Main).launch { updateChatUI() }
-        CoroutineScope(Dispatchers.IO).launch { networkHelper.pushGistUpdate(chatHistory) }
+        // FIX: Fetch the absolute latest state before pushing to prevent ghost resurrections!
+        CoroutineScope(Dispatchers.IO).launch {
+            val latestHistory = networkHelper.fetchChatHistory()
+            if (latestHistory != null) {
+                chatHistory.clear()
+                chatHistory.addAll(latestHistory)
+            }
+            
+            chatHistory.add(newMessage)
+            saveCacheAndReadState()
+            networkHelper.pushGistUpdate(chatHistory)
+            
+            CoroutineScope(Dispatchers.Main).launch { updateChatUI() }
+        }
     }
 
     private suspend fun handleFileUpload(uri: Uri) {
@@ -613,22 +625,35 @@ class MainActivity : AppCompatActivity() {
             while (isPolling) {
                 val fetchedHistory = networkHelper.fetchChatHistory()
                 
-                if (fetchedHistory != null && fetchedHistory.size > chatHistory.size) {
-                    val lastMessage = fetchedHistory.last()
-                    val isMe = lastMessage.device == currentDeviceName
+                // FIX: Check if lists are DIFFERENT (handles deletions!), not just larger
+                if (fetchedHistory != null && fetchedHistory != chatHistory) {
+                    val isNewMessageAdded = fetchedHistory.size > chatHistory.size
+                    val lastMessage = fetchedHistory.lastOrNull()
+                    val isMe = lastMessage?.device == currentDeviceName
 
                     chatHistory.clear()
                     chatHistory.addAll(fetchedHistory)
                     saveCacheAndReadState()
+                    
                     CoroutineScope(Dispatchers.Main).launch {
                         if (currentGroupName == null) {
-                            showGroupScreen() // FIX 1: Refresh the Group screen when old groups finish loading!
+                            showGroupScreen() // Refresh the group list
                         } else {
-                            updateChatUI()
-                            updateUserCount()
+                            // If you are inside a group that someone else just deleted, kick back to home!
+                            val groupStillExists = chatHistory.any { (it.groupName ?: "Personal Chat") == currentGroupName } || currentGroupName == "Personal Chat"
+                            if (!groupStillExists) {
+                                currentGroupName = null
+                                chatLayout.visibility = View.GONE
+                                showGroupScreen()
+                                Toast.makeText(this@MainActivity, "This group was deleted by another user.", Toast.LENGTH_LONG).show()
+                            } else {
+                                updateChatUI()
+                                updateUserCount()
+                            }
                         }
                         
-                        if (!isFirstLoad && !isMe) {
+                        // Only play sound if a NEW message was ADDED (not for deletions!)
+                        if (!isFirstLoad && !isMe && isNewMessageAdded && lastMessage != null) {
                             playNotificationSound()
                             showNotification(lastMessage.device, CryptoHelper.decrypt(lastMessage.message))
                         }
@@ -638,8 +663,8 @@ class MainActivity : AppCompatActivity() {
                     isFirstLoad = false
                     chatHistory.clear()
                     chatHistory.addAll(fetchedHistory)
+                    saveCacheAndReadState()
                     CoroutineScope(Dispatchers.Main).launch {
-                        // FIX 1: Ensure initial load populates the screen properly
                         if (currentGroupName == null) showGroupScreen() else { updateChatUI(); updateUserCount() }
                     }
                 }
