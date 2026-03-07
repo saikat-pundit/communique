@@ -99,18 +99,17 @@ object GroupUIHelper {
         if (!allGroups.contains("Personal Chat")) allGroups.add(0, "Personal Chat")
 
         // --- NEW: Dynamic Render Function ---
+        // --- NEW: Dynamic Render Function ---
         fun renderList(query: String) {
             listLayout.removeAllViews()
             val filtered = allGroups.filter { it.contains(query, ignoreCase = true) }
             
             filtered.forEach { group ->
-                val groupBtn = Button(context).apply {
-                    text = "📁  $group"
-                    textSize = 18f
-                    gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                // Use a horizontal layout instead of a basic button so we can add the badge
+                val groupContainer = LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
                     setPadding(50, 50, 50, 50)
-                    isAllCaps = false
-                    setTextColor(Color.BLACK)
                     background = GradientDrawable().apply {
                         setColor(Color.WHITE)
                         cornerRadius = 24f
@@ -118,10 +117,39 @@ object GroupUIHelper {
                     layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { 
                         setMargins(0, 0, 0, 20) 
                     }
+                    isClickable = true
+                    isFocusable = true
                     setOnClickListener { onGroupSelected(group) }
                 }
+
+                val groupNameText = TextView(context).apply {
+                    text = "📁  $group"
+                    textSize = 18f
+                    setTextColor(Color.BLACK)
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                }
+                groupContainer.addView(groupNameText)
+
+                // --- NEW: UNREAD BADGE LOGIC ---
+                val unread = unreadCounts[group] ?: 0
+                if (unread > 0) {
+                    val badge = TextView(context).apply {
+                        text = unread.toString()
+                        textSize = 14f
+                        setTextColor(Color.WHITE)
+                        setTypeface(null, Typeface.BOLD)
+                        gravity = Gravity.CENTER
+                        setPadding(20, 6, 20, 6)
+                        minWidth = 75 // Ensures it looks circular even with 1 digit
+                        background = GradientDrawable().apply {
+                            setColor(Color.parseColor("#0B7065")) // Dark Green Circle
+                            cornerRadius = 50f
+                        }
+                    }
+                    groupContainer.addView(badge)
+                }
                 
-                listLayout.addView(groupBtn)
+                listLayout.addView(groupContainer)
             }
         }
 
