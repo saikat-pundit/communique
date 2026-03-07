@@ -44,7 +44,11 @@ import java.text.SimpleDateFormat
 import java.util.*
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
-
+import okio.Buffer
+import okio.BufferedSink
+import okio.ForwardingSink
+import okio.Okio
+import okio.Sink
 data class ChatMessage(
     val device: String, 
     val message: String, 
@@ -287,9 +291,18 @@ class MainActivity : AppCompatActivity() {
                     put("fileBase64", base64File)
                 }
 
-                val requestBody = jsonPayload.toString().toRequestBody("application/json; charset=UTF-8".toMediaType())
-                val request = Request.Builder().url(BuildConfig.GAS_UPLOAD_URL).post(requestBody).build()
+                // 1. Create the standard body
+                val baseRequestBody = jsonPayload.toString().toRequestBody("application/json; charset=UTF-8".toMediaType())
+                
+                // 2. Wrap it in our new Progress Tracker
+                val progressRequestBody = ProgressRequestBody(baseRequestBody) { progress ->
+                    CoroutineScope(Dispatchers.Main).launch {
+                        messageInput.hint = "Uploading: $progress%"
+                    }
+                }
 
+                // 3. Send the wrapped body instead
+                val request = Request.Builder().url(BuildConfig.GAS_UPLOAD_URL).post(progressRequestBody).build()
                 httpClient.newCall(request).execute().use { response ->
                     val responseString = response.body?.string()
                     if (response.isSuccessful && responseString != null) {
@@ -517,5 +530,41 @@ class MainActivity : AppCompatActivity() {
         if (currentSearchQuery.isEmpty() && chatMessageContainer.childCount > 0) {
             chatScrollView.post { chatScrollView.smoothScrollTo(0, chatMessageContainer.bottom) }
         }
+    }
+}
+// Paste this at the absolute bottom of the file
+class ProgressRequestBody(
+    private val requestBody: RequestBody,
+    private val onProgressUpdate: (Int) -> Unit
+) : RequestBody() {
+
+    override fun contentType(): MediaType? = requestBody.contentType()
+
+    override fun contentLength(): Long = requestBody.contentLength()
+
+    override fun writeTo(sink: BufferedSink) {
+        var lastProgress = -1
+        val countingSink = object : ForwardingSink(sink) {
+            var bytesWritten = 0L
+            var contentLength = 0L
+
+            override fun write(source: Buffer, byteCount: Long) {
+                super.write(source, byteCount)
+                if (contentLength == 0L) {
+                    contentLength = contentLength()
+                }
+                bytesWritten += byteCount
+                val progress = ((bytesWritten.toFloat() / contentLength.toFloat()) * 100).toInt()
+                
+                // Only update UI if the percentage actually changed to prevent spamming the Main Thread
+                if (progress != lastProgress) {
+                    lastProgress = progress
+                    onProgressUpdate(progress)
+                }
+            }
+        }
+        val bufferedSink = Okio.buffer(countingSink)
+        requestBody.writeTo(bufferedSink)
+        bufferedSink.flush()
     }
 }
