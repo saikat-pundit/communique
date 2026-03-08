@@ -159,25 +159,14 @@ class MainActivity : AppCompatActivity() {
         }
         addContentView(groupOverlay, groupOverlay.layoutParams)
 
-        val backButton = TextView(this).apply {
-            text = "❮" // Looks identical to a fa-angle-left icon
-            textSize = 22f
-            gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
-            setTypeface(null, Typeface.BOLD)
+        val backButton = ImageView(this).apply {
+            setImageResource(R.drawable.ic_arrow_back) // This calls your new Material XML icon!
             
-            // Create the circular background
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#0B7065")) // Darker green to pop against the header
+            // Set a perfect touch target size (approx 90x90 pixels)
+            layoutParams = LinearLayout.LayoutParams(90, 90).apply {
+                setMargins(0, 0, 32, 0) 
             }
-            
-            // Size and padding for the circle
-            val size = 110 
-            layoutParams = LinearLayout.LayoutParams(size, size).apply {
-                setMargins(0, 0, 32, 0) // Margin pushes it away from the text
-            }
-            setPadding(0, 0, 4, 6) // Nudges the ❮ symbol perfectly into the center of the circle
+            setPadding(12, 12, 12, 12)
             
             setOnClickListener {
                 currentGroupName?.let { markGroupAsRead(it) }
