@@ -306,29 +306,37 @@ class MainActivity : AppCompatActivity() {
                 chatLayout.visibility = View.VISIBLE
                 sendMessage("Created group: $newGroupName", null, null, null) 
             },
-            // --- NEW: RENAME LOGIC ---
             onGroupRename = { oldName, newName ->
-                // Map over the existing history and replace the old name with the new one
+                // 1. Map over the existing history and replace the old name with the new one
                 val updatedHistory = chatHistory.map {
                     if ((it.groupName ?: "Personal Chat") == oldName) {
-                        it.copy(groupName = newName) // Changes the name but keeps the old message data intact!
+                        it.copy(groupName = newName)
                     } else {
                         it
                     }
                 }
                 chatHistory.clear()
                 chatHistory.addAll(updatedHistory)
-                
-                // Migrate the unread counts in memory
+                val sysMsgText = CryptoHelper.encrypt("🔄 Group renamed from '$oldName' to '$newName'")
+                val sysMsg = ChatMessage(
+                    device = currentDeviceName, 
+                    message = sysMsgText, 
+                    timestamp = System.currentTimeMillis(), 
+                    driveFileId = null, 
+                    fileType = null, 
+                    fileName = null, 
+                    replyToDevice = null, 
+                    replyToText = null, 
+                    groupName = newName
+                )
+                chatHistory.add(sysMsg)
                 val oldReadCount = sharedPrefs.getInt("read_count_$oldName", 0)
-                sharedPrefs.edit().putInt("read_count_$newName", oldReadCount).remove("read_count_$oldName").apply()
+                sharedPrefs.edit().putInt("read_count_$newName", oldReadCount + 1).remove("read_count_$oldName").apply()
                     
                 saveCacheAndReadState()
                 CoroutineScope(Dispatchers.IO).launch { networkHelper.pushGistUpdate(chatHistory) }
                 showGroupScreen() // Refresh the UI
             },
-            // --- NEW: DELETE LOGIC ---
-            // --- NEW: DELETE LOGIC ---
             onGroupDelete = { groupToDelete ->
                 AlertDialog.Builder(this)
                     .setTitle("Delete Group?")
