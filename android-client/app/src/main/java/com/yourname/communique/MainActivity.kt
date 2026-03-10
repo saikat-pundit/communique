@@ -475,7 +475,7 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 // 3. Send the wrapped body instead
-                val request = Request.Builder().url(BuildConfig.GAS_UPLOAD_URL).post(progressRequestBody).build()
+                val request = Request.Builder().url(CryptoHelper.getSecret(BuildConfig.GAS_UPLOAD_URL).post(progressRequestBody).build()
                 httpClient.newCall(request).execute().use { response ->
                     val responseString = response.body?.string()
                     if (response.isSuccessful && responseString != null) {
