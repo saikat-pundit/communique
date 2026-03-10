@@ -195,12 +195,18 @@ class MainActivity : AppCompatActivity() {
                 imm.hideSoftInputFromWindow(pinInput.windowToken, 0)
 
                 loginLayout.animate().alpha(0f).setDuration(500).withEndAction {
-                    loginLayout.visibility = View.GONE
-                    chatLayout.alpha = 1f // FIX 2 & 3: Make chat fully opaque so it's not a white screen!
-                    isPolling = true
-                    startPollingGist()
-                    showGroupScreen()
-                }.start()
+    loginLayout.visibility = View.GONE
+    chatLayout.visibility = View.VISIBLE // Ensure this is visible BEFORE polling
+    chatLayout.alpha = 1f
+    
+    isPolling = true
+    startPollingGist()
+    
+    // Safety check: Don't show group screen if activity is finishing
+    if (!isFinishing) {
+        showGroupScreen()
+    }
+}.start()
             } else {
                 Toast.makeText(this, "Incorrect App Lock PIN", Toast.LENGTH_SHORT).show()
             }
