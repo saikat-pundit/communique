@@ -1,4 +1,5 @@
 package com.yourname.communique
+
 import android.provider.MediaStore
 import android.Manifest
 import android.app.NotificationChannel
@@ -53,6 +54,8 @@ import okio.buffer
 import android.view.inputmethod.InputMethodManager
 import android.app.AlertDialog
 import android.content.DialogInterface
+
+// DATA MODEL
 data class ChatMessage(
     val device: String, 
     val message: String, 
@@ -64,6 +67,7 @@ data class ChatMessage(
     val replyToText: String? = null,
     val groupName: String? = null
 )
+
 class MainActivity : AppCompatActivity() {
 
     private val httpClient = OkHttpClient()
@@ -79,6 +83,7 @@ class MainActivity : AppCompatActivity() {
     private var currentSearchIndex = -1
     private var replyingToDevice: String? = null
     private var replyingToText: String? = null
+    
     private lateinit var chatMessageContainer: LinearLayout
     private lateinit var chatScrollView: ScrollView
     private lateinit var userCountText: TextView
@@ -90,6 +95,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var mediaManager: MediaManager
     private lateinit var chatLayout: RelativeLayout
     private lateinit var sharedPrefs: android.content.SharedPreferences
+
     private val filePickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri?.let {
             Toast.makeText(this, "Preparing file for upload...", Toast.LENGTH_SHORT).show()
@@ -104,7 +110,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         sharedPrefs = getSharedPreferences("CommuniqueCache", Context.MODE_PRIVATE)
         
-        // INSTANT LOAD: Read from cache before the network even starts!
+        // Load Cache
         val cachedJson = sharedPrefs.getString("chat_ledger_cache", null)
         if (cachedJson != null) {
             try {
@@ -114,7 +120,7 @@ class MainActivity : AppCompatActivity() {
                 chatHistory.addAll(cachedList)
             } catch (e: Exception) { e.printStackTrace() }
         }
-        // Initialize MediaManager
+
         mediaManager = MediaManager(this, httpClient)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -127,6 +133,7 @@ class MainActivity : AppCompatActivity() {
         val manufacturer = Build.MANUFACTURER.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
         currentDeviceName = "$manufacturer ${Build.MODEL}"
 
+        // UI Initialization
         val loginLayout = findViewById<LinearLayout>(R.id.loginLayout)
         chatLayout = findViewById(R.id.chatLayout)
         val loginTriggerButton = findViewById<Button>(R.id.loginTriggerButton)
@@ -150,7 +157,7 @@ class MainActivity : AppCompatActivity() {
 
         chatMessageContainer = findViewById(R.id.chatMessageContainer)
         chatScrollView = findViewById(R.id.chatScrollView)
-        // --- NEW: Dynamic Group Overlay & Back Button ---
+
         groupOverlay = FrameLayout(this).apply {
             layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
             visibility = View.GONE
@@ -160,14 +167,9 @@ class MainActivity : AppCompatActivity() {
         addContentView(groupOverlay, groupOverlay.layoutParams)
 
         val backButton = ImageView(this).apply {
-            setImageResource(R.drawable.ic_arrow_back) // This calls your new Material XML icon!
-            
-            // Set a perfect touch target size (approx 90x90 pixels)
-            layoutParams = LinearLayout.LayoutParams(90, 90).apply {
-                setMargins(0, 0, 32, 0) 
-            }
+            setImageResource(R.drawable.ic_arrow_back)
+            layoutParams = LinearLayout.LayoutParams(90, 90).apply { setMargins(0, 0, 32, 0) }
             setPadding(12, 12, 12, 12)
-            
             setOnClickListener {
                 currentGroupName?.let { markGroupAsRead(it) }
                 currentGroupName = null
@@ -175,8 +177,8 @@ class MainActivity : AppCompatActivity() {
                 showGroupScreen()
             }
         }
-        (userCountText.parent as LinearLayout).addView(backButton, 0) // Injects into Chat Header
-        // ------------------------------------------------
+        (userCountText.parent as LinearLayout).addView(backButton, 0)
+
         detectedDeviceText.text = "Device Name: $currentDeviceName"
 
         try { Glide.with(this).asGif().load(R.drawable.login).into(gifImageView) } catch (e: Exception) {}
@@ -195,34 +197,24 @@ class MainActivity : AppCompatActivity() {
                 imm.hideSoftInputFromWindow(pinInput.windowToken, 0)
 
                 loginLayout.animate().alpha(0f).setDuration(500).withEndAction {
-    loginLayout.visibility = View.GONE
-    chatLayout.visibility = View.VISIBLE // Ensure this is visible BEFORE polling
-    chatLayout.alpha = 1f
-    
-    isPolling = true
-    startPollingGist()
-    
-    // Safety check: Don't show group screen if activity is finishing
-    if (!isFinishing) {
-        showGroupScreen()
-    }
-}.start()
+                    loginLayout.visibility = View.GONE
+                    chatLayout.visibility = View.VISIBLE
+                    chatLayout.alpha = 1f
+                    isPolling = true
+                    startPollingGist()
+                    if (!isFinishing) showGroupScreen()
+                }.start()
             } else {
-                Toast.makeText(this, "Incorrect App Lock PIN", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Incorrect PIN", Toast.LENGTH_SHORT).show()
             }
         }
 
+        // Search Listeners
         searchIcon.setOnClickListener {
-            if (searchContainer.visibility == View.VISIBLE) {
-                closeSearch(searchContainer, searchInput)
-            } else {
-                searchContainer.visibility = View.VISIBLE
-                searchInput.requestFocus()
-            }
+            if (searchContainer.visibility == View.VISIBLE) closeSearch(searchContainer, searchInput)
+            else { searchContainer.visibility = View.VISIBLE; searchInput.requestFocus() }
         }
-
         closeSearchBtn.setOnClickListener { closeSearch(searchContainer, searchInput) }
-
         searchInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -231,37 +223,32 @@ class MainActivity : AppCompatActivity() {
                 executeSearch()
             }
         })
-        
-        searchUpBtn.setOnClickListener {
-            if (searchMatchIndices.isNotEmpty()) {
-                currentSearchIndex = if (currentSearchIndex > 0) currentSearchIndex - 1 else searchMatchIndices.size - 1
-                updateSearchIndicatorAndScroll()
-            }
-        }
+        searchUpBtn.setOnClickListener { navigateSearch(-1) }
+        searchDownBtn.setOnClickListener { navigateSearch(1) }
 
-        searchDownBtn.setOnClickListener {
-            if (searchMatchIndices.isNotEmpty()) {
-                currentSearchIndex = if (currentSearchIndex < searchMatchIndices.size - 1) currentSearchIndex + 1 else 0
-                updateSearchIndicatorAndScroll()
-            }
-        }
-
-        attachButton.setOnClickListener {
-            filePickerLauncher.launch("*/*")
-        }
-
+        attachButton.setOnClickListener { filePickerLauncher.launch("*/*") }
         findViewById<View>(R.id.sendButton).setOnClickListener {
             val text = messageInput.text.toString().trim()
             if (text.isNotEmpty()) {
                 messageInput.text.clear()
-                sendMessage(text, null, null)
+                sendMessage(text)
             }
         }
     }
+
+    private fun navigateSearch(direction: Int) {
+        if (searchMatchIndices.isNotEmpty()) {
+            currentSearchIndex = if (direction > 0) {
+                if (currentSearchIndex < searchMatchIndices.size - 1) currentSearchIndex + 1 else 0
+            } else {
+                if (currentSearchIndex > 0) currentSearchIndex - 1 else searchMatchIndices.size - 1
+            }
+            updateSearchIndicatorAndScroll()
+        }
+    }
+
     private fun saveCacheAndReadState() {
-        // Save the whole chat history to phone memory
         sharedPrefs.edit().putString("chat_ledger_cache", gson.toJson(chatHistory)).apply()
-        // If we are currently in a group, update its read count so we don't show badges for messages we just saw/sent
         currentGroupName?.let { markGroupAsRead(it) }
     }
 
@@ -274,12 +261,13 @@ class MainActivity : AppCompatActivity() {
         val counts = mutableMapOf<String, Int>()
         val grouped = chatHistory.groupBy { it.groupName ?: "Personal Chat" }
         for ((group, messages) in grouped) {
-            val lastRead = sharedPrefs.getInt("read_count_$group", 0) // 0 means first time ever!
+            val lastRead = sharedPrefs.getInt("read_count_$group", 0)
             val unread = messages.size - lastRead
             if (unread > 0) counts[group] = unread
         }
         return counts
     }
+
     private fun showGroupScreen() {
         groupOverlay.removeAllViews()
         val screen = GroupUIHelper.buildGroupScreen(
@@ -288,7 +276,7 @@ class MainActivity : AppCompatActivity() {
             unreadCounts = getUnreadCounts(),
             onGroupSelected = { groupName ->
                 currentGroupName = groupName
-                markGroupAsRead(groupName) 
+                markGroupAsRead(groupName)
                 groupOverlay.visibility = View.GONE
                 chatLayout.visibility = View.VISIBLE
                 updateChatUI()
@@ -299,247 +287,128 @@ class MainActivity : AppCompatActivity() {
                 markGroupAsRead(newGroupName)
                 groupOverlay.visibility = View.GONE
                 chatLayout.visibility = View.VISIBLE
-                sendMessage("Created group: $newGroupName", null, null, null) 
+                sendMessage("Created group: $newGroupName")
             },
             onGroupRename = { oldName, newName ->
-                // 1. Map over the existing history and replace the old name with the new one
                 val updatedHistory = chatHistory.map {
-                    if ((it.groupName ?: "Personal Chat") == oldName) {
-                        it.copy(groupName = newName)
-                    } else {
-                        it
-                    }
+                    if ((it.groupName ?: "Personal Chat") == oldName) it.copy(groupName = newName) else it
                 }
                 chatHistory.clear()
                 chatHistory.addAll(updatedHistory)
-                val sysMsgText = CryptoHelper.encrypt("🔄 Group renamed from '$oldName' to '$newName'")
-                val sysMsg = ChatMessage(
-                    device = currentDeviceName, 
-                    message = sysMsgText, 
-                    timestamp = System.currentTimeMillis(), 
-                    driveFileId = null, 
-                    fileType = null, 
-                    fileName = null, 
-                    replyToDevice = null, 
-                    replyToText = null, 
-                    groupName = newName
-                )
+                val sysMsg = ChatMessage(currentDeviceName, CryptoHelper.encrypt("🔄 Group renamed to '$newName'"), System.currentTimeMillis(), groupName = newName)
                 chatHistory.add(sysMsg)
-                val oldReadCount = sharedPrefs.getInt("read_count_$oldName", 0)
-                sharedPrefs.edit().putInt("read_count_$newName", oldReadCount + 1).remove("read_count_$oldName").apply()
-                    
                 saveCacheAndReadState()
                 CoroutineScope(Dispatchers.IO).launch { networkHelper.pushGistUpdate(chatHistory) }
-                showGroupScreen() // Refresh the UI
+                showGroupScreen()
             },
             onGroupDelete = { groupToDelete ->
-                AlertDialog.Builder(this)
-                    .setTitle("Delete Group?")
-                    .setMessage("Do you want to delete '$groupToDelete' and ALL its messages permanently?")
-                    // 1st Warning Fix: Explicitly typed underscores
-                    .setPositiveButton("Yes") { _: DialogInterface, _: Int ->  
-                        
-                        // Security PIN Prompt
-                        val pinInput = EditText(this).apply { 
-                            hint = "Enter App PIN"
-                            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
-                            gravity = Gravity.CENTER
-                        }
-                        
-                        AlertDialog.Builder(this)
-                            .setTitle("Authentication Required")
-                            .setView(pinInput)
-                            // 2nd Warning Fix: Explicitly typed underscores
-                            .setPositiveButton("Confirm") { _: DialogInterface, _: Int -> 
-                                if (pinInput.text.toString() == "3142") {
-                                    // PIN correct: Wipe the group from the array
-                                    chatHistory.removeAll { (it.groupName ?: "Personal Chat") == groupToDelete }
-                                    sharedPrefs.edit().remove("read_count_$groupToDelete").apply()
-                                    
-                                    saveCacheAndReadState()
-                                    CoroutineScope(Dispatchers.IO).launch { networkHelper.pushGistUpdate(chatHistory) }
-                                    showGroupScreen()
-                                    Toast.makeText(this, "Group deleted.", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    Toast.makeText(this, "Incorrect PIN.", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                            .setNegativeButton("Cancel", null)
-                            .show()
-                    }
-                    .setNegativeButton("No", null)
-                    .show()
+                // Pin confirmation and deletion logic...
+                confirmDeletion(groupToDelete)
             }
         )
         groupOverlay.addView(screen)
         groupOverlay.visibility = View.VISIBLE
     }
 
+    private fun confirmDeletion(groupToDelete: String) {
+        AlertDialog.Builder(this)
+            .setTitle("Delete Group?")
+            .setMessage("Permanently delete '$groupToDelete'?")
+            .setPositiveButton("Yes") { _, _ ->
+                val pinIn = EditText(this).apply { inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD }
+                AlertDialog.Builder(this).setTitle("Confirm PIN").setView(pinIn).setPositiveButton("Confirm") { _, _ ->
+                    if (pinIn.text.toString() == "3142") {
+                        chatHistory.removeAll { (it.groupName ?: "Personal Chat") == groupToDelete }
+                        sharedPrefs.edit().remove("read_count_$groupToDelete").apply()
+                        saveCacheAndReadState()
+                        CoroutineScope(Dispatchers.IO).launch { networkHelper.pushGistUpdate(chatHistory) }
+                        showGroupScreen()
+                    }
+                }.show()
+            }.setNegativeButton("No", null).show()
+    }
+
     private fun sendMessage(rawText: String, driveFileId: String? = null, fileType: String? = null, fileName: String? = null) {
         val encryptedText = CryptoHelper.encrypt(rawText)
         val encryptedFileId = driveFileId?.let { CryptoHelper.encrypt(it) }
+        val encReplyDev = replyingToDevice?.let { CryptoHelper.encrypt(it) }
+        val encReplyTxt = replyingToText?.let { CryptoHelper.encrypt(it) }
+
+        val newMessage = ChatMessage(currentDeviceName, encryptedText, System.currentTimeMillis(), encryptedFileId, fileType, fileName, encReplyDev, encReplyTxt, currentGroupName ?: "Personal Chat")
         
-        // Encrypt the quoted text so it stays secure!
-        val encryptedReplyDevice = replyingToDevice?.let { CryptoHelper.encrypt(it) }
-        val encryptedReplyText = replyingToText?.let { CryptoHelper.encrypt(it) }
-        
-        val newMessage = ChatMessage(currentDeviceName, encryptedText, System.currentTimeMillis(), encryptedFileId, fileType, fileName, encryptedReplyDevice, encryptedReplyText, currentGroupName ?: "Personal Chat")
-        
-        // Reset the reply state and UI instantly for the user
         replyingToDevice = null
         replyingToText = null
         messageInput.hint = "Type a message..."
-        
-        // FIX: Fetch the absolute latest state before pushing to prevent ghost resurrections!
+
         CoroutineScope(Dispatchers.IO).launch {
-            val latestHistory = networkHelper.fetchChatHistory()
-            if (!latestHistory.isNullOrEmpty())
+            val latest = networkHelper.fetchChatHistory()
+            if (!latest.isNullOrEmpty()) {
                 chatHistory.clear()
-                chatHistory.addAll(latestHistory)
+                chatHistory.addAll(latest)
             }
-            
             chatHistory.add(newMessage)
             saveCacheAndReadState()
             networkHelper.pushGistUpdate(chatHistory)
-            
-            CoroutineScope(Dispatchers.Main).launch { updateChatUI() }
+            withContext(Dispatchers.Main) { updateChatUI() }
         }
     }
 
     private suspend fun handleFileUpload(uri: Uri) {
         withContext(Dispatchers.IO) {
             try {
-                val contentResolver = applicationContext.contentResolver
-                val mimeType = contentResolver.getType(uri) ?: "application/octet-stream"
+                val cr = applicationContext.contentResolver
+                val mime = cr.getType(uri) ?: "application/octet-stream"
+                var fName = "file_${System.currentTimeMillis()}"
+                cr.query(uri, null, null, null, null)?.use { c ->
+                    val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (c.moveToFirst()) fName = c.getString(idx)
+                }
                 
-                var fileName = "file_${System.currentTimeMillis()}"
-                contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    if (cursor.moveToFirst()) fileName = cursor.getString(nameIndex)
-                }
+                val bytes = cr.openInputStream(uri)?.readBytes() ?: return@withContext
+                val encBytes = mediaManager.encryptFileBytes(bytes)
+                val base64 = Base64.encodeToString(encBytes, Base64.DEFAULT)
 
-                val fileSize = contentResolver.openInputStream(uri)?.available() ?: 0
-                if (fileSize > 5 * 1024 * 1024) {
-                    withContext(Dispatchers.Main) { Toast.makeText(this@MainActivity, "File too large (max 5MB)", Toast.LENGTH_LONG).show() }
-                    return@withContext
-                }
-
-                var fileBytes = contentResolver.openInputStream(uri)?.readBytes() ?: return@withContext
-                var finalMimeType = mimeType
-                var finalFileName = fileName
-
-                if (mimeType.startsWith("image/")) {
-                    try {
-                        // FIX: Use different decoding methods based on Android version
-                        val bitmap: Bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                            // For Android 9 and above
-                            val source = ImageDecoder.createSource(contentResolver, uri)
-                            ImageDecoder.decodeBitmap(source)
-                        } else {
-                            // For Android 8 and below (fixes the Android 7 crash!)
-                            @Suppress("DEPRECATION")
-                            MediaStore.Images.Media.getBitmap(contentResolver, uri)
-                        }
-
-                        val baos = ByteArrayOutputStream()
-                        val format = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                            Bitmap.CompressFormat.WEBP_LOSSY
-                        } else {
-                            @Suppress("DEPRECATION")
-                            Bitmap.CompressFormat.WEBP
-                        }
-                        
-                        bitmap.compress(format, 80, baos)
-                        fileBytes = baos.toByteArray()
-                        finalMimeType = "image/webp"
-                        finalFileName = fileName.substringBeforeLast(".") + ".webp"
-                    } catch (e: Exception) { 
-                        e.printStackTrace() 
-                    }
-                }
-
-                withContext(Dispatchers.Main) { Toast.makeText(this@MainActivity, "Encrypting and Uploading $finalFileName...", Toast.LENGTH_SHORT).show() }
-
-                // USE MEDIAMANAGER TO ENCRYPT
-                val encryptedBytes = mediaManager.encryptFileBytes(fileBytes)
-                val base64File = Base64.encodeToString(encryptedBytes, Base64.DEFAULT)
-
-                val jsonPayload = JSONObject().apply {
-                    put("fileName", finalFileName)
+                val payload = JSONObject().apply {
+                    put("fileName", fName)
                     put("mimeType", "application/octet-stream")
-                    put("fileBase64", base64File)
+                    put("fileBase64", base64)
                 }
 
-                // 1. Create the standard body
-                val baseRequestBody = jsonPayload.toString().toRequestBody("application/json; charset=UTF-8".toMediaType())
-                
-                // 2. Wrap it in our new Progress Tracker
-                val progressRequestBody = ProgressRequestBody(baseRequestBody) { progress ->
-                    CoroutineScope(Dispatchers.Main).launch {
-                        messageInput.hint = "Uploading: $progress%"
-                    }
+                val body = payload.toString().toRequestBody("application/json".toMediaType())
+                val progressBody = ProgressRequestBody(body) { p ->
+                    CoroutineScope(Dispatchers.Main).launch { messageInput.hint = "Uploading: $p%" }
                 }
 
-                // 3. Send the wrapped body instead
-                val realUrl = SecretDecoder.decode(BuildConfig.GAS_UPLOAD_URL)
-                val request = Request.Builder().url(realUrl).post(progressRequestBody).build()
-                httpClient.newCall(request).execute().use { response ->
-                    val responseString = response.body?.string()
-                    if (response.isSuccessful && responseString != null) {
-                        val jsonResponse = JSONObject(responseString)
-                        if (jsonResponse.optString("status") == "success") {
-                            val fileId = jsonResponse.getString("fileId")
-                            
-                            // Safely switch to the Main thread to read and clear the UI text
+                val url = SecretDecoder.decode(BuildConfig.GAS_UPLOAD_URL)
+                val req = Request.Builder().url(url).post(progressBody).build()
+                httpClient.newCall(req).execute().use { resp ->
+                    val respStr = resp.body?.string()
+                    if (resp.isSuccessful && respStr != null) {
+                        val jResp = JSONObject(respStr)
+                        if (jResp.optString("status") == "success") {
+                            val fid = jResp.getString("fileId")
                             withContext(Dispatchers.Main) {
-                                val text = messageInput.text.toString().trim().ifEmpty { "Sent an encrypted file" }
-                                messageInput.text.clear()
-                                messageInput.hint = "Type a message..." // <--- ADD THIS LINE TO RESET THE HINT
-                                Toast.makeText(this@MainActivity, "Upload complete!", Toast.LENGTH_SHORT).show()
-                                
-                                sendMessage(text, fileId, finalMimeType, finalFileName)
+                                messageInput.hint = "Type a message..."
+                                sendMessage("Sent a file", fid, mime, fName)
                             }
-                        } else {
-                            withContext(Dispatchers.Main) { Toast.makeText(this@MainActivity, "GAS Error: ${jsonResponse.optString("message")}", Toast.LENGTH_LONG).show() }
                         }
-                    } else {
-                        withContext(Dispatchers.Main) { Toast.makeText(this@MainActivity, "Upload failed (${response.code})", Toast.LENGTH_LONG).show() }
                     }
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                withContext(Dispatchers.Main) { Toast.makeText(this@MainActivity, "Upload error: ${e.message}", Toast.LENGTH_LONG).show() }
-            }
+            } catch (e: Exception) { e.printStackTrace() }
         }
     }
 
     private fun triggerDownload(fileId: String, fileName: String, fileType: String) {
-        Toast.makeText(this, "Downloading and decrypting...", Toast.LENGTH_SHORT).show()
-
         CoroutineScope(Dispatchers.IO).launch {
-            // USE MEDIAMANAGER TO DOWNLOAD AND DECRYPT
             val file = mediaManager.downloadAndDecryptFile(fileId, fileName)
-            
             if (file != null) {
-                val uri = androidx.core.content.FileProvider.getUriForFile(
-                    this@MainActivity,
-                    "${applicationContext.packageName}.provider",
-                    file
-                )
-                withContext(Dispatchers.Main) {
-                    val intent = Intent(Intent.ACTION_VIEW).apply {
-                        setDataAndType(uri, fileType)
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-                    try {
-                        startActivity(intent)
-                    } catch (e: Exception) {
-                        Toast.makeText(this@MainActivity, "No app found to open this file.", Toast.LENGTH_SHORT).show()
-                    }
+                val uri = androidx.core.content.FileProvider.getUriForFile(this@MainActivity, "${packageName}.provider", file)
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, fileType)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
-            } else {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@MainActivity, "Failed to download or decrypt file.", Toast.LENGTH_LONG).show()
+                    try { startActivity(intent) } catch (e: Exception) { Toast.makeText(this@MainActivity, "No app found", Toast.LENGTH_SHORT).show() }
                 }
             }
         }
@@ -557,22 +426,16 @@ class MainActivity : AppCompatActivity() {
 
     private fun executeSearch() {
         searchMatchIndices.clear()
-        currentSearchIndex = -1
         if (currentSearchQuery.isEmpty()) {
             searchIndicatorLayout.visibility = View.GONE
             updateChatUI()
             return
         }
-
-        for ((index, msg) in chatHistory.withIndex()) {
-            val textMatch = CryptoHelper.decrypt(msg.message).contains(currentSearchQuery, ignoreCase = true)
-            val fileMatch = msg.fileName?.contains(currentSearchQuery, ignoreCase = true) == true
-            
-            if (textMatch || fileMatch) {
+        chatHistory.forEachIndexed { index, msg ->
+            if (CryptoHelper.decrypt(msg.message).contains(currentSearchQuery, true) || msg.fileName?.contains(currentSearchQuery, true) == true) {
                 searchMatchIndices.add(index)
             }
         }
-
         if (searchMatchIndices.isNotEmpty()) {
             searchIndicatorLayout.visibility = View.VISIBLE
             currentSearchIndex = searchMatchIndices.size - 1
@@ -586,200 +449,113 @@ class MainActivity : AppCompatActivity() {
         if (searchMatchIndices.isEmpty()) return
         searchPositionText.text = "(${currentSearchIndex + 1}/${searchMatchIndices.size})"
         updateChatUI()
-        val targetGlobalIndex = searchMatchIndices[currentSearchIndex]
-        val wrapperLayout = chatMessageContainer.getChildAt(targetGlobalIndex)
-        if (wrapperLayout != null) {
-            chatScrollView.post { chatScrollView.smoothScrollTo(0, wrapperLayout.top) }
+        val target = searchMatchIndices[currentSearchIndex]
+        chatMessageContainer.getChildAt(target)?.let { v ->
+            chatScrollView.post { chatScrollView.smoothScrollTo(0, v.top) }
         }
     }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(CHANNEL_ID, "Communique Chat", NotificationManager.IMPORTANCE_HIGH)
-            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(channel)
+            val chan = NotificationChannel(CHANNEL_ID, "Communique", NotificationManager.IMPORTANCE_HIGH)
+            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(chan)
         }
     }
 
-    private fun showNotification(sender: String, message: String) {
-        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_menu_send)
-            .setContentTitle(sender)
-            .setContentText(message)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setAutoCancel(true)
-
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
-                notificationManager.notify(System.currentTimeMillis().toInt(), builder.build())
-            }
-        } else {
-            notificationManager.notify(System.currentTimeMillis().toInt(), builder.build())
-        }
+    private fun showNotification(s: String, m: String) {
+        val b = NotificationCompat.Builder(this, CHANNEL_ID).setSmallIcon(android.R.drawable.ic_menu_send).setContentTitle(s).setContentText(m).setPriority(NotificationCompat.PRIORITY_HIGH).setAutoCancel(true)
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.notify(System.currentTimeMillis().toInt(), b.build())
     }
 
     private fun playNotificationSound() {
-        try {
-            RingtoneManager.getRingtone(applicationContext, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)).play()
-        } catch (e: Exception) {}
+        try { RingtoneManager.getRingtone(this, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)).play() } catch (e: Exception) {}
     }
 
     private fun startPollingGist() {
-    CoroutineScope(Dispatchers.IO).launch {
-        while (isPolling) {
-            val fetchedHistory = networkHelper.fetchChatHistory()
-            
-            // 1. Only proceed if we actually got data
-            if (fetchedHistory != null) {
-                
-                // 2. Use size and last message timestamp as a cheaper, safer "change" check
-                val hasChanged = fetchedHistory.size != chatHistory.size || 
-                                 (fetchedHistory.lastOrNull()?.timestamp != chatHistory.lastOrNull()?.timestamp)
-
-                if (hasChanged || isFirstLoad) {
-                    val isNewMessageAdded = fetchedHistory.size > chatHistory.size
-                    val lastMessage = fetchedHistory.lastOrNull()
-                    val isMe = lastMessage?.device == currentDeviceName
-
-                    // Update the local list
-                    chatHistory.clear()
-                    chatHistory.addAll(fetchedHistory)
-                    saveCacheAndReadState()
-
-                    // 3. Switch to Main thread SAFELY
-                    withContext(Dispatchers.Main) {
-                        // Check if the activity is still alive to prevent "Context destroyed" crashes
-                        if (!isFinishing && !isDestroyed) {
-                            
-                            if (currentGroupName == null) {
-                                // Only refresh if the group overlay is actually visible
-                                if (groupOverlay.visibility == View.VISIBLE || isFirstLoad) {
-                                    showGroupScreen()
-                                }
-                            } else {
-                                val groupStillExists = chatHistory.any { (it.groupName ?: "Personal Chat") == currentGroupName } || currentGroupName == "Personal Chat"
-                                
-                                if (!groupStillExists) {
-                                    currentGroupName = null
-                                    chatLayout.visibility = View.GONE
-                                    showGroupScreen()
-                                    Toast.makeText(this@MainActivity, "Group no longer exists", Toast.LENGTH_SHORT).show()
+        CoroutineScope(Dispatchers.IO).launch {
+            while (isPolling) {
+                val fetched = networkHelper.fetchChatHistory()
+                if (fetched != null) {
+                    val changed = fetched.size != chatHistory.size || (fetched.lastOrNull()?.timestamp != chatHistory.lastOrNull()?.timestamp)
+                    if (changed || isFirstLoad) {
+                        val isNew = fetched.size > chatHistory.size
+                        val last = fetched.lastOrNull()
+                        val isMe = last?.device == currentDeviceName
+                        chatHistory.clear()
+                        chatHistory.addAll(fetched)
+                        saveCacheAndReadState()
+                        withContext(Dispatchers.Main) {
+                            if (!isFinishing && !isDestroyed) {
+                                if (currentGroupName == null) {
+                                    if (groupOverlay.visibility == View.VISIBLE || isFirstLoad) showGroupScreen()
                                 } else {
-                                    updateChatUI()
-                                    updateUserCount()
+                                    val exists = chatHistory.any { (it.groupName ?: "Personal Chat") == currentGroupName } || currentGroupName == "Personal Chat"
+                                    if (!exists) { currentGroupName = null; chatLayout.visibility = View.GONE; showGroupScreen() }
+                                    else { updateChatUI(); updateUserCount() }
                                 }
-                            }
-
-                            // 4. Handle notifications
-                            if (!isFirstLoad && !isMe && isNewMessageAdded && lastMessage != null) {
-                                playNotificationSound()
-                                showNotification(lastMessage.device, CryptoHelper.decrypt(lastMessage.message))
+                                if (!isFirstLoad && !isMe && isNew && last != null) {
+                                    playNotificationSound()
+                                    showNotification(last.device, CryptoHelper.decrypt(last.message))
+                                }
                             }
                         }
+                        isFirstLoad = false
                     }
-                    isFirstLoad = false
                 }
+                delay(5000)
             }
-            delay(5000)
         }
     }
-}
 
     private fun updateUserCount() {
-        val group = currentGroupName ?: "Personal Chat"
-        val groupHistory = chatHistory.filter { (it.groupName ?: "Personal Chat") == group }
-        ChatUIHelper.updateUserCountBar(this, userCountText, groupHistory, currentDeviceName, group)
+        val g = currentGroupName ?: "Personal Chat"
+        val hist = chatHistory.filter { (it.groupName ?: "Personal Chat") == g }
+        ChatUIHelper.updateUserCountBar(this, userCountText, hist, currentDeviceName, g)
     }
 
     private fun updateChatUI() {
         chatMessageContainer.removeAllViews()
-        val groupHistory = chatHistory.filter { (it.groupName ?: "Personal Chat") == (currentGroupName ?: "Personal Chat") }
-        val imageIndices = groupHistory.indices.filter { groupHistory[it].fileType?.startsWith("image/") == true }
-        val autoDownloadIndices = imageIndices.takeLast(2)
-        for ((index, msg) in groupHistory.withIndex()) {
-            val decryptedText = CryptoHelper.decrypt(msg.message)
-            val decryptedFileId = msg.driveFileId?.let { CryptoHelper.decrypt(it) }
-            val isFocusedMatch = searchMatchIndices.isNotEmpty() && currentSearchIndex >= 0 && searchMatchIndices[currentSearchIndex] == index
-            val isAutoDownload = index in autoDownloadIndices
-
-            // Delegate the UI building to our new helper file
-            val bubbleView = ChatUIHelper.buildMessageBubble(
-                context = this,
-                msg = msg,
-                currentDeviceName = currentDeviceName,
-                isAutoDownload = isAutoDownload,
-                decryptedText = decryptedText,
-                decryptedFileId = decryptedFileId,
-                currentSearchQuery = currentSearchQuery,
-                isFocusedSearchMatch = isFocusedMatch,
-                mediaManager = mediaManager,
-                onDownloadClicked = { fileId, fileName, fileType ->
-                    triggerDownload(fileId, fileName, fileType)
-                },
-                onMessageLongClick = { quotedDevice, quotedText ->
-                    // Set the state and change the text box hint to show we are replying!
-                    replyingToDevice = quotedDevice
-                    replyingToText = quotedText
-                    messageInput.hint = "Replying to $quotedDevice (Tap to cancel)..."
-                    
-                    // Allow tapping the empty text box to cancel the reply
-                messageInput.setOnClickListener {
-                    if (messageInput.text.isEmpty() && replyingToDevice != null) {
-                        replyingToDevice = null
-                        replyingToText = null
-                        messageInput.hint = "Type a message..."
-                        Toast.makeText(this@MainActivity, "Reply cancelled", Toast.LENGTH_SHORT).show()
-                    }
+        val g = currentGroupName ?: "Personal Chat"
+        val hist = chatHistory.filter { (it.groupName ?: "Personal Chat") == g }
+        val imgIdx = hist.indices.filter { hist[it].fileType?.startsWith("image/") == true }
+        val autoIdx = imgIdx.takeLast(2)
+        
+        for ((i, msg) in hist.withIndex()) {
+            val dTxt = CryptoHelper.decrypt(msg.message)
+            val dFid = msg.driveFileId?.let { CryptoHelper.decrypt(it) }
+            val isMatch = searchMatchIndices.isNotEmpty() && currentSearchIndex >= 0 && searchMatchIndices[currentSearchIndex] == i
+            
+            val bubble = ChatUIHelper.buildMessageBubble(
+                this, msg, currentDeviceName, i in autoIdx, dTxt, dFid, currentSearchQuery, isMatch, mediaManager,
+                { fid, fn, ft -> triggerDownload(fid, fn, ft) },
+                { qd, qt -> 
+                    replyingToDevice = qd
+                    replyingToText = qt
+                    messageInput.hint = "Replying to $qd..."
                 }
-            }
-        ) // <--- Just close the parenthesis here!
-
-        chatMessageContainer.addView(bubbleView)
+            )
+            chatMessageContainer.addView(bubble)
         }
-
-        // Auto-scroll to bottom if not searching
-        if (currentSearchQuery.isEmpty() && chatMessageContainer.childCount > 0) {
-            chatScrollView.post { chatScrollView.smoothScrollTo(0, chatMessageContainer.bottom) }
-        }
+        if (currentSearchQuery.isEmpty()) chatScrollView.post { chatScrollView.smoothScrollTo(0, chatMessageContainer.bottom) }
     }
 }
-// Paste this at the absolute bottom of the file
-class ProgressRequestBody(
-    private val requestBody: RequestBody,
-    private val onProgressUpdate: (Int) -> Unit
-) : RequestBody() {
 
-    override fun contentType(): MediaType? = requestBody.contentType()
-
-    override fun contentLength(): Long = requestBody.contentLength()
-
+// PROGRESS REQUEST BODY CLASS
+class ProgressRequestBody(private val rb: RequestBody, private val onProgress: (Int) -> Unit) : RequestBody() {
+    override fun contentType() = rb.contentType()
+    override fun contentLength() = rb.contentLength()
     override fun writeTo(sink: BufferedSink) {
-        var lastProgress = -1
-        
-        // FIXED: Force the Kotlin compiler to recognize this as a 'Sink'
-        val countingSink: Sink = object : ForwardingSink(sink) {
+        val countingSink = object : ForwardingSink(sink) {
             var bytesWritten = 0L
-            var contentLength = 0L
-
             override fun write(source: Buffer, byteCount: Long) {
                 super.write(source, byteCount)
-                if (contentLength == 0L) {
-                    contentLength = contentLength()
-                }
                 bytesWritten += byteCount
-                val progress = ((bytesWritten.toFloat() / contentLength.toFloat()) * 100).toInt()
-                
-                // Only update UI if the percentage actually changed
-                if (progress != lastProgress) {
-                    lastProgress = progress
-                    onProgressUpdate(progress)
-                }
+                onProgress(((bytesWritten.toFloat() / contentLength().toFloat()) * 100).toInt())
             }
         }
-        
-        // This will now compile perfectly!
         val bufferedSink = countingSink.buffer()
-        requestBody.writeTo(bufferedSink)
+        rb.writeTo(bufferedSink)
         bufferedSink.flush()
     }
 }
