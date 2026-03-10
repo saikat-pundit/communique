@@ -18,8 +18,7 @@ class MediaManager(private val context: Context, private val httpClient: OkHttpC
 
     private fun getSecretKey(): SecretKeySpec {
         val digest = MessageDigest.getInstance("SHA-256")
-        val realKey = SecretDecoder.decode(BuildConfig.ENCRYPTION_KEY) // DECODE HERE
-        val keyBytes = digest.digest(realKey.toByteArray(Charsets.UTF_8))
+        val keyBytes = digest.digest(BuildConfig.ENCRYPTION_KEY.toByteArray(Charsets.UTF_8))
         return SecretKeySpec(keyBytes, "AES")
     }
 
@@ -47,8 +46,7 @@ class MediaManager(private val context: Context, private val httpClient: OkHttpC
                 if (file.exists() && file.length() > 0) return@withContext file
 
                 // Request the file from your Google Apps Script
-                val realUrl = SecretDecoder.decode(BuildConfig.GAS_UPLOAD_URL)
-                val url = "$realUrl?fileId=$fileId"
+                val url = "${BuildConfig.GAS_UPLOAD_URL}?fileId=$fileId"
                 val request = Request.Builder().url(url).build()
 
                 httpClient.newCall(request).execute().use { response ->
