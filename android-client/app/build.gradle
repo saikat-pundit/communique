@@ -21,12 +21,13 @@ android {
         versionCode 1
         versionName "1.0"
 
-        // Inject the secrets into Kotlin securely
-        buildConfigField "String", "GIST_TOKEN", localProperties.getProperty("GIST_TOKEN", "\"\"")
-        buildConfigField "String", "CHAT_GIST_ID", localProperties.getProperty("CHAT_GIST_ID", "\"\"")
-        buildConfigField "String", "GAS_UPLOAD_URL", localProperties.getProperty("GAS_UPLOAD_URL", "\"\"")
-        buildConfigField "String", "ENCRYPTION_KEY", localProperties.getProperty("ENCRYPTION_KEY", "\"\"")
-        buildConfigField "String", "ARCHIVE_GIST_ID", properties["ARCHIVE_GIST_ID"] ?: "\"\""
+        def scramble = { String s -> "\"" + s.bytes.encodeBase64().toString() + "\"" }
+
+        buildConfigField "String", "GIST_TOKEN", scramble(localProperties.getProperty("GIST_TOKEN", ""))
+        buildConfigField "String", "CHAT_GIST_ID", scramble(localProperties.getProperty("CHAT_GIST_ID", ""))
+        buildConfigField "String", "GAS_UPLOAD_URL", scramble(localProperties.getProperty("GAS_UPLOAD_URL", ""))
+        buildConfigField "String", "ENCRYPTION_KEY", scramble(localProperties.getProperty("ENCRYPTION_KEY", ""))
+        buildConfigField "String", "ARCHIVE_GIST_ID", scramble(localProperties.getProperty("ARCHIVE_GIST_ID", ""))
     }
 
     buildFeatures {
