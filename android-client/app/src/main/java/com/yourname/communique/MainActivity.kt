@@ -477,23 +477,39 @@ class MainActivity : AppCompatActivity() {
             while (isPolling) {
                 val fetched = networkHelper.fetchChatHistory()
                 if (fetched != null) {
-                    val changed = fetched.size != chatHistory.size || (fetched.lastOrNull()?.timestamp != chatHistory.lastOrNull()?.timestamp)
+                    // Safety check for empty lists
+                    val fetchedLastTime = fetched.lastOrNull()?.timestamp ?: 0L
+                    val localLastTime = chatHistory.lastOrNull()?.timestamp ?: 0L
+                    
+                    val changed = fetched.size != chatHistory.size || fetchedLastTime != localLastTime
+
                     if (changed || isFirstLoad) {
                         val isNew = fetched.size > chatHistory.size
                         val last = fetched.lastOrNull()
                         val isMe = last?.device == currentDeviceName
+                        
                         chatHistory.clear()
                         chatHistory.addAll(fetched)
                         saveCacheAndReadState()
+                        
                         withContext(Dispatchers.Main) {
                             if (!isFinishing && !isDestroyed) {
                                 if (currentGroupName == null) {
-                                    if (groupOverlay.visibility == View.VISIBLE || isFirstLoad) showGroupScreen()
+                                    showGroupScreen()
                                 } else {
+                                    // Verify the group still exists in the new data
                                     val exists = chatHistory.any { (it.groupName ?: "Personal Chat") == currentGroupName } || currentGroupName == "Personal Chat"
-                                    if (!exists) { currentGroupName = null; chatLayout.visibility = View.GONE; showGroupScreen() }
-                                    else { updateChatUI(); updateUserCount() }
+                                    if (!exists) { 
+                                        currentGroupName = null
+                                        chatLayout.visibility = View.GONE
+                                        showGroupScreen() 
+                                    } else { 
+                                        updateChatUI()
+                                        updateUserCount() 
+                                    }
                                 }
+                                
+                                // Only notify if there's actually a message to show
                                 if (!isFirstLoad && !isMe && isNew && last != null) {
                                     playNotificationSound()
                                     showNotification(last.device, CryptoHelper.decrypt(last.message))
