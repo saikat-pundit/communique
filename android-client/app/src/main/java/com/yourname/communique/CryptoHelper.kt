@@ -7,7 +7,8 @@ import javax.crypto.spec.SecretKeySpec
 
 object CryptoHelper {
     fun getSecret(scrambled: String): String {
-        return String(Base64.decode(scrambled, Base64.DEFAULT), Charsets.UTF_8)
+        val decoded = String(Base64.decode(scrambled, Base64.DEFAULT), Charsets.UTF_8)
+        return decoded.removePrefix("\"").removeSuffix("\"")
     }
 
     private fun getSecretKey(): SecretKeySpec {
