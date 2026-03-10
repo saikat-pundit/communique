@@ -562,21 +562,4 @@ class ProgressRequestBody(private val rb: RequestBody, private val onProgress: (
         bufferedSink.flush()
     }
 }
-// The class below should be OUTSIDE the MainActivity class
-class ProgressRequestBody(private val rb: RequestBody, private val onProgress: (Int) -> Unit) : RequestBody() {
-    override fun contentType() = rb.contentType()
-    override fun contentLength() = rb.contentLength()
-    override fun writeTo(sink: BufferedSink) {
-        val countingSink = object : ForwardingSink(sink) {
-            var bytesWritten = 0L
-            override fun write(source: Buffer, byteCount: Long) {
-                super.write(source, byteCount)
-                bytesWritten += byteCount
-                onProgress(((bytesWritten.toFloat() / contentLength().toFloat()) * 100).toInt())
-            }
-        }
-        val bufferedSink = countingSink.buffer()
-        rb.writeTo(bufferedSink)
-        bufferedSink.flush()
-    }
-}
+
