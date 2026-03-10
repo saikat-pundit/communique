@@ -12,13 +12,9 @@ class NetworkHelper(private val httpClient: OkHttpClient, private val gson: Gson
 
     fun fetchChatHistory(): List<ChatMessage>? {
         // FIX 1: Add cache buster and headers to force GitHub to send the latest reverted messages
-        // NEW: Decode the obfuscated secrets at runtime!
-        val realGistId = SecretDecoder.decode(BuildConfig.CHAT_GIST_ID)
-        val realToken = SecretDecoder.decode(BuildConfig.GIST_TOKEN)
-
         val request = Request.Builder()
-            .url("https://api.github.com/gists/$realGistId?t=${System.currentTimeMillis()}")
-            .addHeader("Authorization", "Bearer $realToken")
+            .url("https://api.github.com/gists/${BuildConfig.CHAT_GIST_ID}?t=${System.currentTimeMillis()}")
+            .addHeader("Authorization", "Bearer ${BuildConfig.GIST_TOKEN}")
             .addHeader("Cache-Control", "no-store, no-cache")
             .build()
 
@@ -76,14 +72,9 @@ class NetworkHelper(private val httpClient: OkHttpClient, private val gson: Gson
                 })
             })
         }
-        
-        // NEW: Decode the obfuscated secrets at runtime!
-        val realGistId = SecretDecoder.decode(BuildConfig.CHAT_GIST_ID)
-        val realToken = SecretDecoder.decode(BuildConfig.GIST_TOKEN)
-        
         val request = Request.Builder()
-            .url("https://api.github.com/gists/$realGistId")
-            .addHeader("Authorization", "Bearer $realToken")
+            .url("https://api.github.com/gists/${BuildConfig.CHAT_GIST_ID}")
+            .addHeader("Authorization", "Bearer ${BuildConfig.GIST_TOKEN}")
             .patch(payload.toString().toRequestBody("application/json".toMediaType()))
             .build()
 
@@ -96,14 +87,10 @@ class NetworkHelper(private val httpClient: OkHttpClient, private val gson: Gson
 
     private fun safePushToArchive(newArchiveMessages: List<ChatMessage>): Boolean {
         return try {
-            // NEW: Decode the obfuscated secrets at runtime!
-            val realArchiveId = SecretDecoder.decode(BuildConfig.ARCHIVE_GIST_ID)
-            val realToken = SecretDecoder.decode(BuildConfig.GIST_TOKEN)
-
             // 1. Fetch current Archive so we don't overwrite it
             val fetchReq = Request.Builder()
-                .url("https://api.github.com/gists/$realArchiveId?t=${System.currentTimeMillis()}")
-                .addHeader("Authorization", "Bearer $realToken")
+                .url("https://api.github.com/gists/${BuildConfig.ARCHIVE_GIST_ID}?t=${System.currentTimeMillis()}")
+                .addHeader("Authorization", "Bearer ${BuildConfig.GIST_TOKEN}")
                 .addHeader("Cache-Control", "no-store, no-cache")
                 .build()
 
@@ -133,11 +120,9 @@ class NetworkHelper(private val httpClient: OkHttpClient, private val gson: Gson
                     })
                 })
             }
-            
-            // Re-use the decoded secrets for the patch request
             val pushReq = Request.Builder()
-                .url("https://api.github.com/gists/$realArchiveId")
-                .addHeader("Authorization", "Bearer $realToken")
+                .url("https://api.github.com/gists/${BuildConfig.ARCHIVE_GIST_ID}")
+                .addHeader("Authorization", "Bearer ${BuildConfig.GIST_TOKEN}")
                 .patch(payload.toString().toRequestBody("application/json".toMediaType()))
                 .build()
 
