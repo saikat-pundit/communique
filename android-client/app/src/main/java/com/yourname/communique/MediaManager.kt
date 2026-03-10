@@ -18,7 +18,8 @@ class MediaManager(private val context: Context, private val httpClient: OkHttpC
 
     private fun getSecretKey(): SecretKeySpec {
         val digest = MessageDigest.getInstance("SHA-256")
-        val keyBytes = digest.digest(BuildConfig.ENCRYPTION_KEY.toByteArray(Charsets.UTF_8))
+        val realKey = SecretDecoder.decode(BuildConfig.ENCRYPTION_KEY) // DECODE HERE
+        val keyBytes = digest.digest(realKey.toByteArray(Charsets.UTF_8))
         return SecretKeySpec(keyBytes, "AES")
     }
 
