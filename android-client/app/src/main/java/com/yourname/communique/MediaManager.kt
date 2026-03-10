@@ -47,7 +47,8 @@ class MediaManager(private val context: Context, private val httpClient: OkHttpC
                 if (file.exists() && file.length() > 0) return@withContext file
 
                 // Request the file from your Google Apps Script
-                val url = "${BuildConfig.GAS_UPLOAD_URL}?fileId=$fileId"
+                val realUrl = SecretDecoder.decode(BuildConfig.GAS_UPLOAD_URL)
+                val url = "$realUrl?fileId=$fileId"
                 val request = Request.Builder().url(url).build()
 
                 httpClient.newCall(request).execute().use { response ->
