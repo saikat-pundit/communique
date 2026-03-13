@@ -115,7 +115,7 @@ object GroupUIHelper {
                     gravity = Gravity.CENTER_VERTICAL
                     setPadding(50, 50, 50, 50)
                     background = GradientDrawable().apply {
-                        setColor(if (group == "Personal Chat") Color.parseColor("#E0FCFF") else Color.WHITE)
+                        setColor(if (group == "Personal Chat") Color.parseColor("#00FFFF") else Color.WHITE)
                         cornerRadius = 24f
                     }
                     layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { 
