@@ -96,9 +96,12 @@ object GroupUIHelper {
         }
         val listLayout = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
 
-        // Extract Groups
-        val allGroups = chatHistory.map { it.groupName ?: "Personal Chat" }.distinct().toMutableList()
-        if (!allGroups.contains("Personal Chat")) allGroups.add(0, "Personal Chat")
+        val allGroups = chatHistory.map { it.groupName ?: "Personal Chat" }
+            .distinct()
+            .filter { it != "Personal Chat" }
+            .toMutableList()
+        
+        allGroups.add(0, "Personal Chat")
 
         // Dynamic Render Function
         fun renderList(query: String) {
@@ -112,7 +115,7 @@ object GroupUIHelper {
                     gravity = Gravity.CENTER_VERTICAL
                     setPadding(50, 50, 50, 50)
                     background = GradientDrawable().apply {
-                        setColor(Color.WHITE)
+                        setColor(if (group == "Personal Chat") Color.parseColor("#E0FCFF") else Color.WHITE)
                         cornerRadius = 24f
                     }
                     layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { 
